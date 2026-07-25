@@ -1,0 +1,12 @@
+<div class="page-card">
+  <div class="page-title">{{PAGE_TITLE}}</div>
+  <div class="page-body">
+    <div class="stats-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:20px">
+      {{STAT_CARDS}}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card-example"><h3>最近{{LIST_TITLE}}</h3><table><thead><tr>{{TABLE_HEADERS}}</tr></thead><tbody>{{TABLE_ROWS}}</tbody></table></div>
+      <div class="card-example"><h3>{{CHART_TITLE}}</h3><div style="height:200px;background:var(--bg);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--text-secondary)">图表区域</div></div>
+    </div>
+  </div>
+</div>

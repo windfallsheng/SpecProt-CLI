@@ -1,0 +1,32 @@
+# 设计系统 — 自动提取
+# 来源: https://ant.design (Ant Design) (https://ant.design)
+#
+# 修改此文件后执行 specprot prototype 即可生效
+
+colors:
+  primary: "#1677ff"
+  danger: "#ff4d4f"
+  success: "#52c41a"
+  warning: "#faad14"
+  background: "rgba(0,0,0,0.15)"
+  text: "#fff"
+  textSecondary: "#666"
+  border: "#e8e8e8"
+
+typography:
+  fontFamily: "'AlibabaSans'"
+  fontSize: "14px"
+  headingSize: "18px"
+
+spacing:
+  base: "8px"
+  small: "4px"
+  medium: "16px"
+  large: "24px"
+
+components:
+  borderRadius: "var(--ant-border-beam-border-radius, 0px)"
+  buttonRadius: "8px"
+  buttonPadding: "8px 20px"
+  cardShadow: "0 2px 8px rgba(0,0,0,0.08)"
+  inputHeight: "36px"

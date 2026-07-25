@@ -1,0 +1,19 @@
+<div class="page-card">
+  <div class="page-title">{{PAGE_TITLE}}</div>
+  <div class="page-body">
+    <div class="search-bar">
+      <input type="text" placeholder="搜索..." />
+      <select><option>全部</option>{{FILTER_OPTIONS}}</select>
+      <button class="btn btn-default">搜索</button>
+      <button class="btn btn-default">重置</button>
+      <button class="btn btn-primary" style="margin-left:auto">{{CREATE_BUTTON}}</button>
+    </div>
+    <table>
+      <thead><tr>{{TABLE_HEADERS}}</tr></thead>
+      <tbody>{{TABLE_ROWS}}</tbody>
+    </table>
+    <div class="actions">
+      <span style="color:var(--text-secondary);font-size:13px">共 {{TOTAL}} 条</span>
+    </div>
+  </div>
+</div>
