@@ -8,6 +8,16 @@ program
   .description('产品底座 — 从需求文档生成原型和图表')
   .version(pkg.version);
 
+// ===== 🧠 智能入口：自然语言意图识别 =====
+
+program
+  .command('spec [input...]')
+  .description('自然语言智能入口 — 说人话就行')
+  .action(async (input: string[]) => {
+    const { specCommand } = await import('./commands/spec');
+    await specCommand(input?.join(' ') || '');
+  });
+
 // ===== 🏗️ 全局层 & 期次管理 =====
 
 const iterationCmd = program
