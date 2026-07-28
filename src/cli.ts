@@ -18,6 +18,70 @@ program
     await specCommand(input?.join(' ') || '');
   });
 
+// ===== 📦 任务文件夹管理 =====
+
+const taskCmd = program
+  .command('task')
+  .alias('t')
+  .description('任务文件夹管理');
+
+taskCmd
+  .command('create')
+  .alias('cr')
+  .description('创建任务文件夹（含素材区、各端文档、产出区）')
+  .requiredOption('-n, --name <name>', '任务名称（即文件夹名）')
+  .option('-p, --platforms <list>', '涉及平台: web,h5,miniapp (逗号分隔)', 'web')
+  .option('-d, --desc <desc>', '简短描述')
+  .action(async (options) => {
+    const { taskCreateCommand } = await import('./commands/task');
+    await taskCreateCommand(options);
+  });
+
+taskCmd
+  .command('list')
+  .alias('ls')
+  .description('列出所有任务')
+  .action(async () => {
+    const { taskListCommand } = await import('./commands/task');
+    await taskListCommand();
+  });
+
+taskCmd
+  .command('show')
+  .description('查看任务详情')
+  .requiredOption('-n, --name <name>', '任务名称')
+  .action(async (options) => {
+    const { taskShowCommand } = await import('./commands/task');
+    await taskShowCommand(options.name);
+  });
+
+taskCmd
+  .command('status')
+  .description('更新任务状态')
+  .requiredOption('-n, --name <name>', '任务名称')
+  .requiredOption('-s, --status <status>', '状态: 素材收集/批量生成/待精修/评审中/已冻结/已交付/暂缓')
+  .action(async (options) => {
+    const { taskStatusCommand } = await import('./commands/task');
+    await taskStatusCommand(options.name, options.status);
+  });
+
+// ===== 🚀 批量处理引擎 =====
+
+program
+  .command('batch')
+  .alias('b')
+  .description('批量处理所有任务 — 下班前执行，第二天看结果')
+  .option('-a, --action <action>', '操作类型: generate(生成初稿) / check(完整性检查) / both(全部)', 'both')
+  .option('-t, --tasks <list>', '指定任务 (逗号分隔)，留空 = 全部')
+  .option('-p, --platforms <list>', '指定平台 (逗号分隔)，留空 = 任务配置的平台')
+  .option('-s, --status <status>', '只处理指定状态的任务')
+  .option('--prototype', '同时生成原型', false)
+  .option('--flow', '同时生成流程图', false)
+  .action(async (options) => {
+    const { batchCommand } = await import('./commands/batch');
+    await batchCommand(options);
+  });
+
 // ===== 🏗️ 全局层 & 期次管理 =====
 
 const iterationCmd = program
