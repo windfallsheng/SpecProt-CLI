@@ -14,7 +14,7 @@ node dist/cli.js --help   # 确认可用
 specprot init
 ```
 
-初始化两件事:`~/.speccore/GLOBAL/` 全局需求层(所有需求的单一事实源),以及向宿主 AI 注入 Slash Commands。
+初始化两件事:项目内 `.speccore/GLOBAL/` 全局需求层(所有需求的单一事实源),以及向宿主 AI 注入 Slash Commands。
 
 ## 3. 创建期次
 
@@ -93,6 +93,6 @@ specprot ask "列出所有期次"
 
 ## 下一步
 
-- 命令细节 → [command-reference.md](command-reference.md)
-- 典型场景 → [scenarios.md](scenarios.md)
-- 架构设计 → [architecture.md](architecture.md)
+- 命令细节 → [命令参考](command-reference.md)
+- 典型场景 → [使用场景](scenarios.md)
+- 架构 → [架构设计](architecture.md)

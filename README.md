@@ -9,7 +9,7 @@ SpecProt(需求定稿) → SpecCore(规格开发) → SpecTest(测试验证)
 
 产品在这里只做三件事：**建期次、投素材、跑流水线**。剩下的提炼、成文、切分、深化、图资产、风险裁决，交给流水线和 AI 接力完成。
 
-> 📖 产品同学请看：[docs/product-guide.md](docs/product-guide.md) — 零基础操作指南，每步都告诉你「怎么做、在哪做、会有什么结果」。
+> 📖 产品同学请看：[产品操作指南](docs/product-guide.md) — 零基础操作指南，每步都告诉你「怎么做、在哪做、会有什么结果」。
 
 ## 快速上手（产品三步走）
 
@@ -161,14 +161,14 @@ node dist/cli.js --help   # 查看命令
 
 | 文档 | 内容 |
 | :--- | :--- |
-| [docs/product-guide.md](docs/product-guide.md) | **产品同学从这里开始** — 零基础操作指南（怎么做/在哪做/会有什么结果） |
-| [docs/quick-start.md](docs/quick-start.md) | 安装与第一个期次全流程 |
-| [docs/command-reference.md](docs/command-reference.md) | 22 个命令的完整参考 |
-| [docs/scenarios.md](docs/scenarios.md) | 典型使用场景 |
-| [docs/architecture.md](docs/architecture.md) | 架构设计与数据流 |
-| [docs/quick-reference.md](docs/quick-reference.md) | 速查手册 |
+| [产品操作指南](docs/product-guide.md) | **产品同学从这里开始** — 零基础操作指南（怎么做/在哪做/会有什么结果） |
+| [快速开始](docs/quick-start.md) | 安装与第一个期次全流程 |
+| [命令参考](docs/command-reference.md) | 22 个命令的完整参考 |
+| [使用场景](docs/scenarios.md) | 典型使用场景 |
+| [架构设计](docs/architecture.md) | 分层架构与数据流 |
+| [速查手册](docs/quick-reference.md) | 命令参数矩阵 · 枚举 · 标记速查 |
 
-> 英文版见 [README.en.md](README.en.md) 与 docs/*.en.md —— 中英分离，与 SpecCore 文档体系一致。
+> 英文版见 [英文版 README](README.en.md) 与 docs/*.en.md —— 中英分离，与 SpecCore 文档体系一致。
 
 ## 参与贡献
 

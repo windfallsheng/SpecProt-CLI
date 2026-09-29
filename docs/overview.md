@@ -45,8 +45,8 @@ CLI 不猜语义,AI 不碰确定性,人只把六道闸。三者各守其位,流�
 
 | 文档 | 内容 |
 | :--- | :--- |
-| [quick-start.md](quick-start.md) | 安装与第一个期次全流程 |
-| [command-reference.md](command-reference.md) | 22 个命令的完整参考 |
-| [scenarios.md](scenarios.md) | 典型使用场景 |
-| [architecture.md](architecture.md) | 架构设计与数据流 |
-| [quick-reference.md](quick-reference.md) | 速查手册 |
+| [快速开始](quick-start.md) | 安装与第一个期次全流程 |
+| [命令参考](command-reference.md) | 22 个命令的完整参考 |
+| [使用场景](scenarios.md) | 典型使用场景 |
+| [架构设计](architecture.md) | 分层架构与数据流 |
+| [速查手册](quick-reference.md) | 命令参数矩阵 · 枚举 · 标记速查 |

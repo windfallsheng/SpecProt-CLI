@@ -1,7 +1,6 @@
 #!/usr/bin/env node
+import pkg from '../package.json';
 import { program } from 'commander';
-// @ts-ignore — pkg may not be resolved at build time
-const pkg = { version: '0.1.0' };
 
 program
   .name('specprot')

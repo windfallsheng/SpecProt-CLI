@@ -14,7 +14,7 @@ node dist/cli.js --help   # confirm it works
 specprot init
 ```
 
-Initializes two things: the `~/.speccore/GLOBAL/` global requirement layer (the single source of truth for all requirements), and Slash Commands injection for the host AI.
+Initializes two things: the in-project `.speccore/GLOBAL/` global requirement layer (the single source of truth for all requirements), and Slash Commands injection for the host AI.
 
 ## 3. Create an iteration
 
