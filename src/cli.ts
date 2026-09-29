@@ -5,81 +5,116 @@ const pkg = { version: '0.1.0' };
 
 program
   .name('specprot')
-  .description('产品底座 — 从需求文档生成原型和图表')
+  .description('产品底座 — 需求定稿流水线（素材 → 六段 → 冻结交付镜像，与 SpecCore 交接）')
   .version(pkg.version);
+program.addHelpText(
+  'before',
+  '\n产品三步走:  iteration create 建期次 → 投料进 00-素材/ → run 一条龙(冻结即产出 010-requirements 交付镜像)\n\n'
+);
+
 
 // ===== 🧠 智能入口：自然语言意图识别 =====
 
 program
-  .command('spec [input...]')
-  .description('自然语言智能入口 — 说人话就行')
+  .command('ask [input...]')
+  .description('自然语言智能入口 — 识别意图直接执行（与 SpecCore ask 对齐）')
   .action(async (input: string[]) => {
-    const { specCommand } = await import('./commands/spec');
-    await specCommand(input?.join(' ') || '');
+    const { askCommand } = await import('./commands/ask');
+    await askCommand(input?.join(' ') || '');
   });
 
-// ===== 📦 任务文件夹管理 =====
+// ===== 🔧 素材转换 =====
 
-const taskCmd = program
-  .command('task')
-  .alias('t')
-  .description('任务文件夹管理');
-
-taskCmd
-  .command('create')
-  .alias('cr')
-  .description('创建任务文件夹（含素材区、各端文档、产出区）')
-  .requiredOption('-n, --name <name>', '任务名称（即文件夹名）')
-  .option('-p, --platforms <list>', '涉及平台: web,h5,miniapp (逗号分隔)', 'web')
-  .option('-d, --desc <desc>', '简短描述')
+program
+  .command('convert')
+  .alias('cv')
+  .description('素材转换 — docx/pdf/xlsx → md（录音提示转写，图片建索引）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .option('-p, --platform <platform>', '只转换指定端（默认全部端 + shared）')
   .action(async (options) => {
-    const { taskCreateCommand } = await import('./commands/task');
-    await taskCreateCommand(options);
+    const { convertCommand } = await import('./commands/convert');
+    await convertCommand(options);
   });
 
-taskCmd
-  .command('list')
-  .alias('ls')
-  .description('列出所有任务')
-  .action(async () => {
-    const { taskListCommand } = await import('./commands/task');
-    await taskListCommand();
-  });
+// ===== 🔍 端级分析 =====
 
-taskCmd
-  .command('show')
-  .description('查看任务详情')
-  .requiredOption('-n, --name <name>', '任务名称')
+program
+  .command('analyze')
+  .alias('az')
+  .description('端级分析 — 从端素材提炼完整需求文档（AI 接力）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <platform>', '目标端: web/h5/miniapp/backend')
   .action(async (options) => {
-    const { taskShowCommand } = await import('./commands/task');
-    await taskShowCommand(options.name);
+    const { analyzeCommand } = await import('./commands/analyze');
+    await analyzeCommand(options);
   });
 
-taskCmd
-  .command('status')
-  .description('更新任务状态')
-  .requiredOption('-n, --name <name>', '任务名称')
-  .requiredOption('-s, --status <status>', '状态: 素材收集/批量生成/待精修/评审中/已冻结/已交付/暂缓')
+// ===== 🔪 端内功能切分 =====
+
+program
+  .command('slice')
+  .alias('sl')
+  .description('端内功能切分 — 端级需求切分为功能单元（AI 接力 + 素材溯源）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <platform>', '目标端: web/h5/miniapp/backend')
   .action(async (options) => {
-    const { taskStatusCommand } = await import('./commands/task');
-    await taskStatusCommand(options.name, options.status);
+    const { sliceCommand } = await import('./commands/slice');
+    await sliceCommand(options);
   });
 
 // ===== 🚀 批量处理引擎 =====
 
 program
-  .command('batch')
-  .alias('b')
-  .description('批量处理所有任务 — 下班前执行，第二天看结果')
-  .option('-a, --action <action>', '操作类型: generate(生成初稿) / check(完整性检查) / both(全部)', 'both')
-  .option('-t, --tasks <list>', '指定任务 (逗号分隔)，留空 = 全部')
-  .option('-p, --platforms <list>', '指定平台 (逗号分隔)，留空 = 任务配置的平台')
-  .option('-s, --status <status>', '只处理指定状态的任务')
-  .option('--prototype', '同时生成原型', false)
-  .option('--flow', '同时生成流程图', false)
+  .command('deepen')
+  .description('单元深度完善 — 结构契约(OUTLINE) → 评审包(RISK裁决/CLARIFY/REBOUND 回流)')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <name>', '端名')
+  .option('-f, --feature <name>', '功能单元名（缺省 = 该端全部单元）')
+  .option('--phase <phase>', '阶段: outline / review / all', 'all')
   .action(async (options) => {
-    const { batchCommand } = await import('./commands/batch');
-    await batchCommand(options);
+    const { deepenCommand } = await import('./commands/deepen');
+    await deepenCommand(options);
+  });
+
+program
+  .command('assets')
+  .description('资产生成 — 图(Mermaid) + 原型 HTML + ASSETS.yaml 资产注册表')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <name>', '端名')
+  .requiredOption('-f, --feature <name>', '功能单元名')
+  .option('-k, --kind <kind>', '资产类型: diagrams / prototype / all', 'all')
+  .action(async (options) => {
+    const { assetsCommand } = await import('./commands/assets');
+    await assetsCommand(options);
+  });
+
+program
+  .command('schemes')
+  .description('方案分叉 — 多案对比 + 推荐圈选（冻结时推荐进快照正文，其余进备选附录）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <name>', '端名')
+  .requiredOption('-f, --feature <name>', '功能单元名')
+  .action(async (options) => {
+    const { schemesCommand } = await import('./commands/schemes');
+    await schemesCommand(options);
+  });
+
+// ===== 🎬 流水线编排器（自动/交互双模式） =====
+
+program
+  .command('run')
+  .alias('r')
+  .description('产品流水线 — convert → analyze → slice → deepen → adopt → freeze（全自动/人机交互双模式）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .option('-p, --platforms <list>', '端列表 (逗号分隔)，留空 = 期次配置的平台')
+  .option('--from <stage>', '起始阶段: convert/analyze/slice/deepen/adopt/freeze', 'convert')
+  .option('--to <stage>', '结束阶段: convert/analyze/slice/deepen/adopt/freeze', 'freeze')
+  .option('-m, --mode <mode>', '模式: auto(全自动推进，关键闸口仍停) / interactive(每段停下确认)', 'interactive')
+  .option('-y, --yes', '跳过交互确认（interactive 模式下一键放行）', false)
+  .option('--resume', '断点续跑 — 从上次未完成阶段继续', false)
+  .action(async (options) => {
+    const { runCommand } = await import('./commands/run');
+    await runCommand(options);
   });
 
 // ===== 🏗️ 全局层 & 期次管理 =====
@@ -92,8 +127,9 @@ const iterationCmd = program
 iterationCmd
   .command('create')
   .alias('cr')
-  .description('创建新期次')
+  .description('创建新期次（加工车间：素材区 + 各端需求文档 + 功能单元目录）')
   .requiredOption('-n, --name <name>', '期次名称，如: 期次-2026-Q3')
+  .option('-p, --platforms <list>', '涉及端: web,h5,miniapp,backend (逗号分隔)', 'web')
   .option('-g, --goal <goal>', '本期目标')
   .option('-f, --from <date>', '开始日期')
   .option('-t, --to <date>', '结束日期')
@@ -114,8 +150,9 @@ iterationCmd
 iterationCmd
   .command('freeze')
   .alias('fz')
-  .description('冻结期次，禁止修改需求')
+  .description('冻结期次，禁止修改需求（风险未裁决/待确认未决时拦闸）')
   .requiredOption('-n, --name <name>', '期次名称')
+  .option('--force', '跳过冻结门禁（风险未裁决/待确认未决）', false)
   .action(async (options) => {
     const { iterationFreezeCommand } = await import('./commands/iteration');
     await iterationFreezeCommand(options);
@@ -138,6 +175,29 @@ reqCmd
   .action(async (options) => {
     const { reqNewCommand } = await import('./commands/requirement');
     await reqNewCommand(options);
+  });
+
+reqCmd
+  .command('adopt')
+  .description('收养功能单元进正典（新增血缘：迭代层 → 全局层）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <platform>', '功能单元所在端: web/h5/miniapp/backend')
+  .requiredOption('-f, --feature <name>', '功能单元目录名')
+  .option('-pj, --project <project>', '所属项目', 'default')
+  .action(async (options) => {
+    const { reqAdoptCommand } = await import('./commands/requirement');
+    await reqAdoptCommand(options);
+  });
+
+reqCmd
+  .command('change')
+  .description('标记正典需求变更（冻结时自动回流版本演进）')
+  .requiredOption('-r, --req <id>', '需求 ID，如: REQ-001')
+  .requiredOption('-i, --iteration <name>', '实施变更的期次')
+  .option('-d, --desc <desc>', '变更说明')
+  .action(async (options) => {
+    const { reqChangeCommand } = await import('./commands/requirement');
+    await reqChangeCommand(options);
   });
 
 reqCmd
@@ -197,24 +257,15 @@ program
 program
   .command('check')
   .alias('ck')
-  .description('增量检查 — 对照已有需求和代码分析新需求')
+  .description('需求全面体检 — 骨架/质量/图建议/风险初筛/增量对照 五维评估')
   .option('-i, --iteration <name>', '指定期次')
   .option('-s, --snippet <text>', '直接传入需求片段')
   .option('-f, --file <path>', '读取需求文件')
+  .option('-p, --platform <name>', '端名（配合 -i -u 定位单元文档）')
+  .option('-u, --unit <name>', '功能单元目录名（配合 -i -p 定位单元文档）')
   .action(async (options) => {
     const { checkCommand } = await import('./commands/check');
     await checkCommand(options);
-  });
-
-program
-  .command('review')
-  .alias('rv')
-  .description('生成需求评审报告 (REVIEW.md)')
-  .option('-i, --iteration <name>', '指定期次')
-  .option('-f, --file <path>', '需求文件路径')
-  .action(async (options) => {
-    const { reviewCommand } = await import('./commands/review');
-    await reviewCommand(options);
   });
 
 program
@@ -238,71 +289,8 @@ program
   .command('init')
   .description('初始化项目：全局层 + Slash Commands')
   .action(async () => {
-    const { ensureDir, writeFile } = require('fs-extra');
-    const { join } = require('path');
-
-    // 1. 初始化全局层
-    const { ensureGlobalLayer } = await import('./core/global-layer');
-    await ensureGlobalLayer();
-    console.log('✅ 全局需求层已初始化 (.speccore/GLOBAL/)');
-
-    // 2. 确保 .speccore/ITERATIONS 目录
-    await ensureDir(join(process.cwd(), '.speccore', 'ITERATIONS'));
-
-    // 3. 注入 Slash Commands
-    const tools = ['.codebuddy', '.qoder', '.cursor', '.trae'];
-
-    const commands: [string, string, string][] = [
-      ['prototype', '从需求文档生成 HTML 原型', 'specprot prototype --file="${1:REQUIREMENT.md}" --iteration="${2:}"'],
-      ['check', '增量检查需求完整性和一致性', 'specprot check --file="${1:REQUIREMENT.md}"'],
-      ['review', '生成需求评审报告', 'specprot review --file="${1:REQUIREMENT.md}"'],
-      ['iteration-create', '创建新期次', 'specprot iteration create --name="${1:期次-2026-Q3}" --goal="${2:}"'],
-      ['iteration-list', '列出所有期次', 'specprot iteration list'],
-      ['iteration-freeze', '冻结期次', 'specprot iteration freeze --name="${1:期次-2026-Q3}"'],
-      ['req-new', '新建需求', 'specprot req new --name="${1:需求名称}" --desc="${2:}" --project="${3:default}"'],
-      ['req-list', '列出需求', 'specprot req list'],
-      ['req-link', '关联需求到期次', 'specprot req link --req="${1:REQ-001}" --iteration="${2:期次-2026-Q3}"'],
-      ['req-status', '更新需求状态', 'specprot req status --req="${1:REQ-001}" --status="${2:评审中}"'],
-    ];
-
-    for (const dir of tools) {
-      const cmdDir = join(process.cwd(), dir, 'commands');
-      await ensureDir(cmdDir);
-
-      for (const [name, desc, body] of commands) {
-        await writeFile(join(cmdDir, `${name}.md`), `---
-name: ${name}
-description: ${desc}
----
-
-\`\`\`bash
-cd "$(git rev-parse --show-toplevel)" && ${body}
-\`\`\`
-`);
-      }
-    }
-
-    console.log(`✅ ${commands.length} 个 Slash Commands 已注入到 ${tools.length} 个工具`);
-    console.log('');
-    console.log('📁 项目结构：');
-    console.log('  .speccore/GLOBAL/     ← 全量需求索引');
-    console.log('  期次-XXX/             ← 迭代工作区');
-    console.log('    00-需求文档/');
-    console.log('    01-原型/');
-    console.log('    02-图谱/');
-    console.log('    03-评审/');
-    console.log('    04-交付/');
-  });
-
-program
-  .command('watch')
-  .alias('w')
-  .description('监控需求文件，保存时自动检查并推荐操作')
-  .option('-i, --iteration <name>', '指定期次')
-  .option('-f, --file <path>', '监控文件路径')
-  .action(async (options) => {
-    const { watchCommand } = await import('./commands/watch');
-    await watchCommand(options);
+    const { initCommand } = await import('./commands/init');
+    await initCommand();
   });
 
 program.parse();

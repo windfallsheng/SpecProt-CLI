@@ -14,6 +14,8 @@ import {
   readGlobalIndex,
   ensureGlobalLayer,
   updateReqInIndex,
+  adoptFeatureToGlobal,
+  changeRequirement,
   ReqStatus,
 } from '../core/global-layer';
 
@@ -152,4 +154,70 @@ export async function reqStatusCommand(options: ReqStatusOptions): Promise<void>
 
   await updateReqInIndex(options.req, { status: mappedStatus });
   console.log(`✅ ${options.req} 状态已更新: ${mappedStatus}`);
+}
+
+// ===== 正典归位：新增 / 变更 =====
+
+export interface ReqAdoptOptions {
+  iteration?: string;
+  platform?: string;
+  feature?: string;
+  project?: string;
+}
+
+/** 新增血缘：功能单元收养进正典（迭代层 → 全局层） */
+export async function reqAdoptCommand(options: ReqAdoptOptions): Promise<void> {
+  if (!options.iteration || !options.platform || !options.feature) {
+    console.error('❌ 请指定期次、端与功能单元');
+    console.error('   示例: specprot req adopt -i 期次-2026-Q3 -p web -f 预订功能');
+    return;
+  }
+
+  await ensureGlobalLayer();
+
+  try {
+    const entry = await adoptFeatureToGlobal(
+      options.iteration,
+      options.platform,
+      options.feature,
+      options.project || 'default'
+    );
+    console.log(`✅ 功能单元已收养进正典: ${entry.id} — ${entry.name}`);
+    console.log(`📁 .speccore/GLOBAL/${entry.filePath}`);
+    console.log('');
+    console.log('下一步：');
+    console.log('  · 打开文件继续完善（状态流转: 草稿 → 评审 → 冻结）');
+    console.log(`  · 或继续收养其余单元: specprot req adopt -i ${options.iteration} -p ${options.platform} -f <单元>`);
+  } catch (error) {
+    console.error(`❌ 收养失败: ${error}`);
+  }
+}
+
+export interface ReqChangeOptions {
+  req?: string;
+  iteration?: string;
+  desc?: string;
+}
+
+/** 变更血缘：标记正典需求变更（冻结时自动回流版本演进） */
+export async function reqChangeCommand(options: ReqChangeOptions): Promise<void> {
+  if (!options.req || !options.iteration) {
+    console.error('❌ 请指定需求 ID 与期次');
+    console.error('   示例: specprot req change -r REQ-001 -i 期次-2026-Q3 -d "新增周期会议"');
+    return;
+  }
+
+  await ensureGlobalLayer();
+
+  try {
+    await changeRequirement(options.req, options.iteration, options.desc || '');
+    console.log(`🔄 ${options.req} 已标记变更（实施期次: ${options.iteration}）`);
+    console.log('');
+    console.log('变更生命周期：');
+    console.log('  1. 期次内完成变更加工（素材 → 端级需求 → 功能单元）');
+    console.log(`  2. 冻结时自动回流: specprot iteration freeze -n ${options.iteration}`);
+    console.log('     （正典版本演进 vX.Y → vX.(Y+1)，变更历史落定，状态复位为已交付）');
+  } catch (error) {
+    console.error(`❌ 变更标记失败: ${error}`);
+  }
 }

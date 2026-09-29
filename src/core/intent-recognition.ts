@@ -13,14 +13,11 @@
 
 /** 产品侧意图类型 */
 export type ProductIntent =
+  | 'analyze'           // 端级分析（AI 接力）
+  | 'slice'             // 端内功能切分（AI 接力）
+  | 'convert'           // 素材转换
   | 'check'             // 需求检查分析
   | 'prototype'         // 生成 HTML 原型
-  | 'review'            // 生成评审报告
-  | 'flow'              // 生成流程图
-  | 'data_model'        // 生成数据模型图
-  | 'state_diagram'     // 生成状态机图
-  | 'story_map'         // 生成用户故事地图
-  | 'panorama'          // 生成需求全景图
   | 'iteration_create'  // 创建期次
   | 'iteration_list'    // 查看期次
   | 'iteration_freeze'  // 冻结期次
@@ -30,10 +27,6 @@ export type ProductIntent =
   | 'req_link'          // 关联需求到期次
   | 'design'            // 设计系统管理
   | 'init'              // 项目初始化
-  | 'diff'              // 变更检测
-  | 'impact'            // 变更影响分析
-  | 'export'            // 导出开发 Spec
-  | 'handover'          // 生成交接文档
   | 'help'              // 帮助
   | 'unknown';          // 未识别
 
@@ -63,6 +56,38 @@ export interface CommandMapping {
 // ============================================================
 
 const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
+  // —— 素材工作流（v0.2.0：convert/analyze/slice 新流程）——
+  {
+    id: 'analyze',
+    intent: 'analyze',
+    priority: 102,
+    triggers: ['端级分析', '逐端分析', '提炼需求', '从素材提炼', '分析素材',
+               '生成需求文档', '需求提炼', '端需求', '端的需求'],
+    patterns: ['分析(.+)端需求', '提炼(.+)端需求', '(.+)端需求分析', '分析(.+)端素材',
+               '分析(.+)端', '(.+)端需求'],
+    description: '端级分析 — 从端素材提炼完整需求文档（AI 接力）',
+    example: 'specprot analyze -n "任务" -p web',
+  },
+  {
+    id: 'slice',
+    intent: 'slice',
+    priority: 101,
+    triggers: ['切分功能', '切片', '拆功能', '功能单元', '划分功能',
+               '按功能拆', '拆分功能', '切分', '按功能'],
+    patterns: ['切分(.+)功能', '(.*)按功能切', '(.+)功能单元(.+)', '拆分(.+)功能'],
+    description: '端内功能切分 — 端级需求切分为功能单元（AI 接力 + 素材溯源）',
+    example: 'specprot slice -n "任务" -p web',
+  },
+  {
+    id: 'convert',
+    intent: 'convert',
+    priority: 99,
+    triggers: ['转换素材', '素材转换', '转成文档', '转换文件', '转 md',
+               '转换格式', '整理素材', '转换'],
+    patterns: ['转换(.+)素材', '(.+)素材转换(.+)', '把(.+)转成'],
+    description: '素材转换 — docx/pdf/xlsx → md（录音提示转写，图片建索引）',
+    example: 'specprot task convert -n "任务"',
+  },
   // —— 分析检查 ——
   {
     id: 'check',
@@ -85,72 +110,6 @@ const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
     description: 'HTML 交互原型 — 从需求文档生成可交互的原型页面',
     example: 'specprot prototype',
   },
-  // —— 流程图 ——
-  {
-    id: 'flow',
-    intent: 'flow',
-    priority: 95,
-    triggers: ['流程图', '流程', '操作流程', '步骤', '用户路径', '业务流程',
-               '画流程', '业务流转', '流转图'],
-    patterns: ['生成(.+)流程图', '画(.+)流程', '(.+)的流程(.+)', '(.+)操作步骤(.+)'],
-    description: '用户/业务流程图 — 自动选择最适合的流程图类型',
-    example: 'specprot flow',
-  },
-  // —— 数据模型 ——
-  {
-    id: 'data-model',
-    intent: 'data_model',
-    priority: 92,
-    triggers: ['数据模型', '字段', '数据结构', 'ER图', '实体关系', '有哪些字段',
-               '数据表', '属性'],
-    patterns: ['生成(.+)数据模型', '(.+)有哪些字段', '(.+)数据结构'],
-    description: '数据模型图 — 从字段描述生成 ER 图',
-    example: 'specprot data-model',
-  },
-  // —— 状态机 ——
-  {
-    id: 'state',
-    intent: 'state_diagram',
-    priority: 88,
-    triggers: ['状态图', '状态流转', '状态变化', '状态机', '状态转移',
-               '有哪些状态', '状态管理'],
-    patterns: ['生成(.+)状态图', '(.+)状态(.+)流转', '(.+)有哪些状态'],
-    description: '状态机图 — 从状态描述生成状态流转图',
-    example: 'specprot state',
-  },
-  // —— 评审 ——
-  {
-    id: 'review',
-    intent: 'review',
-    priority: 85,
-    triggers: ['评审', '生成评审', '评审报告', '准备评审', '评审材料',
-               'review', '风险评估', '风险分析'],
-    patterns: ['生成(.+)评审', '准备(.+)评审', '(.+)评审报告'],
-    description: '需求评审报告 — 生成完整性、一致性、风险评估',
-    example: 'specprot review',
-  },
-  // —— 需求全景图 ——
-  {
-    id: 'panorama',
-    intent: 'panorama',
-    priority: 82,
-    triggers: ['全景图', '总览', '全局视图', '模块关系', '依赖关系',
-               '整体看', '全貌', '关系图'],
-    patterns: ['生成(.+)全景图', '(.+)模块(.+)关系', '(.+)全景'],
-    description: '需求全景图 — 模块依赖关系和需求结构总览',
-    example: 'specprot panorama',
-  },
-  // —— 用户故事地图 ——
-  {
-    id: 'storymap',
-    intent: 'story_map',
-    priority: 80,
-    triggers: ['故事地图', '用户故事', '故事拆分', '用户场景', '用户旅程',
-               'user story', '故事卡片'],
-    patterns: ['生成(.+)故事地图', '(.+)用户故事(.+)', '拆分(.+)故事'],
-    description: '用户故事地图 — 角色 × 优先级 × 迭代',
-    example: 'specprot storymap',
-  },
   // —— 期次管理 ——
   {
     id: 'iteration-create',
@@ -158,7 +117,7 @@ const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
     priority: 78,
     triggers: ['创建期次', '新建迭代', '新迭代', '开始一期', '开一期',
                '创建迭代', '新建期次', '开始新版本'],
-    patterns: ['创建(.+)期次', '新建(.+)迭代', '开(.+)期'],
+    patterns: ['创建期次[：:\s]*([^,，\s]+)', '新建期次[：:\s]*([^,，\s]+)', '创建(.+)期次', '新建(.+)迭代', '开(.+)期'],
     description: '创建期次 — 创建新的产品迭代周期',
     example: 'specprot iteration create --name "期次-2026-Q3"',
   },
@@ -178,7 +137,7 @@ const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
     priority: 72,
     triggers: ['冻结', '锁定', '封版', '定版', '需求冻结', '不许改了',
                'freeze', '锁定期次', '冻结需求'],
-    patterns: ['冻结(.+)期次', '锁定(.+)期次', '(.+)封版', '冻结(.+)'],
+    patterns: ['冻结期次[：:\s]*([^,，\s]+)', '冻结(.+)期次', '锁定(.+)期次', '(.+)封版'],
     description: '冻结期次 — 锁定需求，生成开发 Spec',
     example: 'specprot iteration freeze --name "期次-2026-Q3"',
   },
@@ -190,7 +149,7 @@ const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
     triggers: ['新建需求', '添加需求', '新需求', '加一个需求', '写需求',
                '创建需求', '加需求', '新建', '添加功能', '新功能',
                '创建一个'],
-    patterns: ['新建(.+)需求', '添加(.+)需求', '写(.+)需求', '创建(.+)需求',
+    patterns: ['新建需求[：:\s]*([^,，\s]+)', '新建(.+)需求', '添加(.+)需求', '写(.+)需求', '创建(.+)需求',
                '新增(.+)功能', '加一个(.+)需求'],
     description: '新建需求 — 创建需求并存入全局层',
     example: 'specprot req new --name "会议室预订功能"',
@@ -237,54 +196,13 @@ const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
     description: '设计系统管理 — 配置颜色/字体/组件/间距',
     example: 'specprot design',
   },
-  // —— 导出与交接 ——
-  {
-    id: 'export',
-    intent: 'export',
-    priority: 60,
-    triggers: ['导出', '生成开发文档', '给开发的', '开发Spec', '输出Spec',
-               '交接', '交付', '转给开发'],
-    patterns: ['导出(.+)Spec', '生成(.+)开发文档', '给开发(.+)'],
-    description: '导出开发 Spec — 从需求生成 frontend/REQ.md',
-    example: 'specprot export',
-  },
-  {
-    id: 'handover',
-    intent: 'handover',
-    priority: 58,
-    triggers: ['交接文档', '交接材料', '交接清单', '移交给'],
-    patterns: ['生成(.+)交接', '准备(.+)交接', '(.+)交接文档'],
-    description: '交接文档 — 给开发的完整需求材料包',
-    example: 'specprot handover',
-  },
-  // —— 变更管理 ——
-  {
-    id: 'diff',
-    intent: 'diff',
-    priority: 52,
-    triggers: ['对比', '差异', '变化', '改了哪里', '和之前比',
-               'diff', '变更对比', '修改了哪些'],
-    patterns: ['对比(.+)变化', '(.+)和(.+)差异', '(.+)改了(.+)'],
-    description: '变更对比 — 检测需求变更并展示 diff',
-    example: 'specprot diff',
-  },
-  {
-    id: 'impact',
-    intent: 'impact',
-    priority: 50,
-    triggers: ['影响', '影响范围', '改了影响', '影响分析',
-               '会影响哪些', '波及'],
-    patterns: ['分析(.+)影响', '(.+)会影响(.+)', '查看(.+)影响范围'],
-    description: '变更影响分析 — 分析需求变更影响哪些模块',
-    example: 'specprot impact',
-  },
   // —— 初始化 ——
   {
     id: 'init',
     intent: 'init',
     priority: 85,
     triggers: ['初始化', '开始使用', '安装', '配置项目', 'setup'],
-    patterns: ['初始化(.+)项目', '开始使用(.+)', '配置(.+)项目'],
+    patterns: ['初始化(.+)项目', '开始使用(.+)', '配置(.+)项目', '初始化'],
     description: '项目初始化 — 创建全局层 + 注入 Slash Commands',
     example: 'specprot init',
   },
@@ -374,7 +292,7 @@ function extractProductParams(input: string, mapping: CommandMapping): Record<st
   }
 
   // 提取期次名
-  const iterMatch = input.match(/期次[：:\s]*(\S+)/);
+  const iterMatch = input.match(/期次[：:\s]*([^\s,，]+)/);
   if (iterMatch) {
     params.iteration = iterMatch[1];
   }
@@ -386,7 +304,7 @@ function extractProductParams(input: string, mapping: CommandMapping): Record<st
   }
 
   // 提取状态
-  const statusKeywords = ['草稿', '评审中', '已通过', '已冻结', '开发中', '已交付', '已废弃', '暂缓'];
+  const statusKeywords = ['草稿', '评审中', '评审通过', '已通过', '已冻结', '开发中', '已交付', '完成了', '已废弃', '暂缓'];
   for (const s of statusKeywords) {
     if (input.includes(s)) {
       params.status = s;
@@ -415,8 +333,8 @@ function extractProductParams(input: string, mapping: CommandMapping): Record<st
  * 获取置信度级别
  */
 export function getConfidenceLevel(confidence: number): 'high' | 'medium' | 'low' {
-  if (confidence >= 80) return 'high';
-  if (confidence >= 50) return 'medium';
+  if (confidence >= 70) return 'high';
+  if (confidence >= 45) return 'medium';
   return 'low';
 }
 
@@ -432,14 +350,11 @@ export function getAllProductMappings(): CommandMapping[] {
  */
 export function getIntentLabel(intent: ProductIntent): string {
   const labels: Record<ProductIntent, string> = {
+    analyze: '🔍 端级需求分析',
+    slice: '🔪 端内功能切分',
+    convert: '🔧 素材转换',
     check: '🔍 需求检查分析',
     prototype: '🎨 HTML 原型生成',
-    review: '📋 需求评审报告',
-    flow: '🔄 流程图生成',
-    data_model: '📊 数据模型图',
-    state_diagram: '🔀 状态机图',
-    story_map: '🗺️ 用户故事地图',
-    panorama: '🏗️ 需求全景图',
     iteration_create: '📅 创建期次',
     iteration_list: '📋 查看期次',
     iteration_freeze: '🔒 冻结期次',
@@ -449,10 +364,6 @@ export function getIntentLabel(intent: ProductIntent): string {
     req_link: '🔗 关联期次',
     design: '🎨 设计系统',
     init: '🚀 项目初始化',
-    diff: '📊 变更对比',
-    impact: '💥 影响分析',
-    export: '📤 导出 Spec',
-    handover: '📦 交接文档',
     help: '💡 帮助',
     unknown: '❓ 未识别',
   };
