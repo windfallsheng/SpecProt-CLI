@@ -1,4 +1,4 @@
-# SpecProt 概述
+# SpecProt 概述 · 需求定稿工坊
 
 SpecProt 是 SpecCore 生态的**第一道闸**——产品需求在这里定稿,然后以整目录镜像交接给 SpecCore 进入规格开发。
 

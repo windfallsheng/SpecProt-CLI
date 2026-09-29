@@ -1,4 +1,4 @@
-# SpecProt — 产品需求的定稿工坊
+# SpecProt — 需求定稿工坊
 
 SpecProt 是 SpecCore 生态的**第一道闸**：把散乱的素材（讨论记录、截图、Word/PDF）锤炼成冻结定稿的需求文档，再以整目录镜像交接给 SpecCore 进入开发。
 

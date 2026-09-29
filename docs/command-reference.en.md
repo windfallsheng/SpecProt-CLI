@@ -1,4 +1,4 @@
-# Command Reference
+# SpecProt — Command Reference
 
 All 22 SpecProt commands on this page. Convention: `-i` is the iteration name, which is the directory name itself (whatever you passed when creating the iteration is what you use afterwards).
 

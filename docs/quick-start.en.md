@@ -1,4 +1,4 @@
-# Quick Start
+# SpecProt — Quick Start
 
 ## 1. Install
 

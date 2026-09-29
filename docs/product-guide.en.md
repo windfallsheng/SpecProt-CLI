@@ -1,4 +1,4 @@
-# Product Operation Guide (Zero Tech)
+# SpecProt — Product Operation Guide (Zero Tech)
 
 > For product folks. No code knowledge needed. Every step tells you three things: **how to do it, where to do it, and what you will get**.
 

@@ -4,11 +4,11 @@ import { program } from 'commander';
 
 program
   .name('specprot')
-  .description('产品底座 — 需求定稿流水线（素材 → 六段 → 冻结交付镜像，与 SpecCore 交接）')
+  .description('需求定稿工坊（产品底座）— 素材 → 六段 → 冻结交付镜像，与 SpecCore 交接')
   .version(pkg.version);
 program.addHelpText(
   'before',
-  '\n产品三步走:  iteration create 建期次 → 投料进 00-素材/ → run 一条龙(冻结即产出 010-requirements 交付镜像)\n\n'
+  '\n需求定稿工坊 · 产品三步走:  iteration create 建期次 → 投料进 00-素材/ → run 一条龙(冻结即产出 010-requirements 交付镜像)\n\n'
 );
 
 

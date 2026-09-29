@@ -1,4 +1,4 @@
-# Usage Scenarios
+# SpecProt — Usage Scenarios
 
 ## Scenario 1: A fresh iteration, one run to freeze
 
