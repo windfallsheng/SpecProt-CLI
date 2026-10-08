@@ -7,24 +7,25 @@
  * 期次加工车间结构（迭代层）：
  *   期次-XXX/
  *   ├── 00-素材/       ← 产品扔进来的所有材料（按端归类 + shared + converted）
- *   ├── web/           ← Web 端需求文档 + features/ 功能单元
- *   ├── h5/            ← H5 端需求文档 + features/ 功能单元
- *   ├── miniapp/       ← 小程序端需求文档 + features/ 功能单元
- *   ├── backend/       ← 后端需求文档 + features/ 功能单元
- *   ├── _shared/       ← 跨端共享（数据模型、业务规则）
- *   ├── 00-需求文档/   ← 正典引用清单
- *   ├── 01-原型/ 02-图谱/ 03-评审/ 04-交付/
+ *   │   ├── {端}/      ← 各端素材（端名产品自定，如 web / admin-web / h5-mobile）
+ *   │   ├── shared/    ← 跨端通用素材
+ *   │   ├── converted/ ← [自动生成] 转换产物（converted/{端}/ 与端目录一一对应）
+ *   │   └── _templates/ ← [可选] 产品自定文档模板
+ *   ├── {端}/          ← 各端需求文档 + features/ 功能单元（端名与素材区一致）
+ *   ├── _shared/       ← 跨端共享（数据模型、业务规则、术语表）
+ *   ├── 04-交付/       ← [冻结生成] 交付镜像（对齐 SpecCore 010-requirements/）
  *   └── README.md      ← 期次状态追踪（平台/状态/里程碑）
  */
 
-import { ensureDir, writeFile, readFile, pathExists, readdir } from 'fs-extra';
+import { ensureDir, writeFile, readFile, pathExists, readdir, stat } from 'fs-extra';
 import { join } from 'path';
 
 // ============================================================
 // 类型定义
 // ============================================================
 
-export type Platform = 'web' | 'h5' | 'miniapp' | 'backend';
+/** 端名 = 产品自定的标识（英文 kebab-case 为佳，如 web / admin-web / booking-service） */
+export type Platform = string;
 
 export type WorkspaceStatus =
   | '📥 素材收集中'
@@ -161,23 +162,23 @@ export async function collectMaterials(
     return context;
   }
 
-  // 素材端子目录 + converted 转换产物子目录（converted/{端}/ 与素材端目录一一对应）
-  const rawDirs: Array<{ dir: string; platform: Platform | 'shared' }> = [
-    { dir: 'web', platform: 'web' },
-    { dir: 'h5', platform: 'h5' },
-    { dir: 'miniapp', platform: 'miniapp' },
-    { dir: 'backend', platform: 'backend' },
-    { dir: 'shared', platform: 'shared' },
-  ];
-  // converted/{端}/ 归对应端；converted/shared/ 与根级文件（images-index.md）归 shared
+  // 素材端子目录 + converted 转换产物子目录 — 端名产品自定，按素材区实际子目录动态扫描
+  // （converted/{端}/ 与素材端目录一一对应；converted 根级文件如 images-index.md 归 shared）
+  const rawDirs: Array<{ dir: string; platform: Platform | 'shared' }> = [];
+  for (const f of await readdir(materialsDir)) {
+    if (f === 'shared' || f === 'converted' || f === '_templates' || f === 'README.md' || f.startsWith('.')) continue;
+    const st = await stat(join(materialsDir, f));
+    if (!st.isDirectory()) continue;
+    rawDirs.push({ dir: f, platform: f });
+  }
+  rawDirs.push({ dir: 'shared', platform: 'shared' });
   const convertedDirs: Array<{ dir: string; platform: Platform | 'shared' }> = [
-    { dir: 'converted/web', platform: 'web' },
-    { dir: 'converted/h5', platform: 'h5' },
-    { dir: 'converted/miniapp', platform: 'miniapp' },
-    { dir: 'converted/backend', platform: 'backend' },
-    { dir: 'converted/shared', platform: 'shared' },
     { dir: 'converted', platform: 'shared' },
+    { dir: 'converted/shared', platform: 'shared' },
   ];
+  for (const d of rawDirs) {
+    if (d.platform !== 'shared') convertedDirs.push({ dir: `converted/${d.platform}`, platform: d.platform });
+  }
 
   const keepPlatform = (platform: Platform | 'shared') => {
     if (!targetPlatform || targetPlatform === 'shared') return true;
@@ -237,13 +238,44 @@ export async function collectMaterials(
 // 期次信息读取与状态流转
 // ============================================================
 
-/** 平台中文标签映射 */
-export const PLATFORM_LABELS: Record<Platform, string> = {
+/** 端名默认中文标签映射（仅作展示；未知端名显示原名） */
+export const PLATFORM_LABELS: Record<string, string> = {
   web: 'Web 端',
   h5: 'H5 端',
   miniapp: '小程序端',
   backend: '后端',
+  app: '移动端',
+  admin: '管理端',
 };
+
+/**
+ * 解析端声明串：支持 `web=网页端,backend` / `web(网页端), backend` 双语法。
+ * 返回 [{name, label?}]，name 为目录名（命令参数），label 为可选中文展示名。
+ */
+export function parsePlatformTokens(str: string): { name: string; label?: string }[] {
+  return str
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => {
+      // `web(网页端)` 或 `web=网页端`
+      const m = t.match(/^([^=()]+)(?:[=(]\s*([^)\s]+[^)]*?)\s*[)]?)?$/);
+      if (!m) return { name: t };
+      return { name: m[1].trim(), label: m[2]?.trim() || undefined };
+    });
+}
+
+/** 端声明串 → 端名列表（剥离标签与反引号） */
+export function platformNamesFrom(decl: string): string[] {
+  return parsePlatformTokens(decl)
+    .map((t) => t.name.replace(/`/g, ''))
+    .filter(Boolean);
+}
+
+/** 端名 → 展示标签（产品自定标签 > 默认表 > 原名） */
+export function platformLabel(name: string, customLabel?: string): string {
+  return customLabel || PLATFORM_LABELS[name] || name;
+}
 
 /**
  * 读取期次加工车间信息（从 README.md 解析）
@@ -254,15 +286,9 @@ export async function readWorkspaceInfo(iterationName: string): Promise<Workspac
 
   const content = await readFile(readmePath, 'utf-8');
 
-  // 解析平台（`> 平台: web,h5` 行）
+  // 解析平台（`> 平台: web(网页端), backend` 行）— 端名产品自定，括号内为可选标签
   const platformMatch = content.match(/>\s*平台[:：]\s*(.+)/);
-  const platforms: Platform[] = [];
-  if (platformMatch) {
-    const platStr = platformMatch[1];
-    for (const p of ['web', 'h5', 'miniapp', 'backend'] as Platform[]) {
-      if (platStr.includes(p)) platforms.push(p);
-    }
-  }
+  const platforms: Platform[] = platformMatch ? platformNamesFrom(platformMatch[1]) : [];
 
   // 解析状态（`> 状态: 🔄 进行中` 行）
   const statusMatch = content.match(/>\s*状态[:：]\s*(.+)/);
@@ -304,7 +330,7 @@ export async function listActiveIterations(onlyActive = true): Promise<Workspace
     if (!(await pathExists(join(cwd, entry.name, 'README.md')))) continue;
     const info = await readWorkspaceInfo(entry.name);
     if (!info) continue;
-    if (onlyActive && !['🔄 进行中', '�� 素材收集中'].includes(info.status)) continue;
+    if (onlyActive && !['🔄 进行中', '📥 素材收集中'].includes(info.status)) continue;
     iterations.push(info);
   }
 

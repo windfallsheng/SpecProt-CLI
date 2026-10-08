@@ -16,7 +16,9 @@ Everything else — turning materials into text, writing the doc, slicing units,
 
 > "Create iteration Q3, goal: launch meeting room booking"
 
-(Or type: `specprot iteration create -n iteration-Q3 -p web,backend`)
+(Or type: `specprot iteration create -n iteration-Q3 -p "web=网页端,backend=后端服务"`)
+
+**Platform naming tip**: you name the platform folders yourself — English preferred (e.g. `web` / `admin-web`), with a Chinese note after `=` so anyone can tell at a glance. Mismatch with the dev side (SpecCore)? No problem: pass `-m "web=admin-web"` when creating the iteration and freeze will ship a lookup table automatically.
 
 **Where**: the chat box of your AI coding tool, or a terminal.
 

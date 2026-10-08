@@ -12,8 +12,10 @@ import {
   getWorkspaceDir,
   getPlatformDir,
   resolvePlatformTemplate,
+  platformLabel,
   Platform,
 } from '../core/workspace-manager';
+import { buildReferenceContext, formatReferenceSection, ReferenceContext } from '../core/reference-context';
 
 export interface AnalyzeOptions {
   iteration: string;
@@ -21,12 +23,6 @@ export interface AnalyzeOptions {
   apply?: string;   // --apply: JSON {文件路径: 内容} 回写校验（预留）
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  web: 'Web 端',
-  h5: 'H5 端',
-  miniapp: '小程序端',
-  backend: '后端',
-};
 
 export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   if (!options.iteration || !options.platform) {
@@ -36,7 +32,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   }
 
   const platform = options.platform as Platform;
-  const label = PLATFORM_LABELS[platform] || platform;
+  const label = platformLabel(platform);
   const taskDir = getWorkspaceDir(options.iteration);
   if (!(await pathExists(taskDir))) {
     console.error(`❌ 期次不存在: ${options.iteration}`);
@@ -67,7 +63,10 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const reqTemplate = await resolvePlatformTemplate(options.iteration, platform, 'REQUIREMENT.md');
   const clarifyTemplate = await resolvePlatformTemplate(options.iteration, platform, 'CLARIFY.md');
 
-  // 4. 组装 prompt
+  // 4. 参考上下文（正典同端历史需求摘要 + 术语表/规则 + 设计系统 + 端名映射桥）
+  const reference = await buildReferenceContext(options.iteration, platform);
+
+  // 5. 组装 prompt
   const prompt = buildPlatformPrompt({
     iterationName: options.iteration,
     platform,
@@ -78,6 +77,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     clarifyTemplate,
     platformSources,
     sharedSources,
+    reference,
   });
 
   // 5. 输出接力标记
@@ -103,6 +103,7 @@ function buildPlatformPrompt(ctx: {
   clarifyTemplate: { path: string; content: string } | null;
   platformSources: { file: string; content: string }[];
   sharedSources: { file: string; content: string }[];
+  reference: ReferenceContext;
 }): string {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
   let p = `# 期次: ${ctx.iterationName} — ${ctx.label}需求分析\n\n`;
@@ -121,7 +122,11 @@ function buildPlatformPrompt(ctx: {
   p += `3. 跨端通用的内容（业务规则、数据模型、通用流程）**引用 _shared/ 目录，不复制内容**\n`;
   p += `4. **素材中没有的信息不编造**——空缺处保持「待确认」，记入待确认清单\n`;
   p += `5. 验收标准必须可测试，格式: \`AC-NN: [前置条件] → [操作] → [预期结果]\`\n`;
-  p += `6. 页面/接口清单要完整：每个页面列出字段、操作按钮、业务规则\n\n`;
+  p += `6. 页面/接口清单要完整：每个页面列出字段、操作按钮、业务规则\n`;
+  p += `7. **参考上下文**（下方「参考上下文」节）：与同端历史需求保持术语与风格一致，同名概念不得另造术语；与既有需求重复/冲突处必须记入待确认清单\n\n`;
+
+  // 参考上下文（既有沉淀:历史需求 / 术语表 / 共享规则 / 设计系统 / 端名映射桥）
+  p += formatReferenceSection(ctx.reference, ctx.label);
 
   p += `## 待确认清单格式（CLARIFY.md）\n\n`;
   if (ctx.clarifyTemplate) {

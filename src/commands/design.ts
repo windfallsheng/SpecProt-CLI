@@ -2,11 +2,16 @@
  * /design 命令 — 六种方式提取设计系统
  */
 import { writeFile, pathExists, readFile } from 'fs-extra';
+import { join } from 'path';
 import { execSync } from 'child_process';
 
 export async function designCommand(options: any) {
-  const output = options.output || 'DESIGN_SYSTEM.yaml';
-  const styleGuide = 'STYLE_GUIDE.html';
+  // 默认落全局层（.speccore/GLOBAL/）——风格资产的权威居所；--output 可自定义
+  const { ensureGlobalLayer } = await import('../core/global-layer');
+  await ensureGlobalLayer();
+  const globalDs = join('.speccore', 'GLOBAL', 'DESIGN_SYSTEM.yaml');
+  const output = options.output || globalDs;
+  const styleGuide = options.output ? 'STYLE_GUIDE.html' : join('.speccore', 'GLOBAL', 'STYLE_GUIDE.html');
 
   async function writeAndGuide(yamlPath: string) {
     const { renderStyleGuide } = await import('../engines/style-guide');

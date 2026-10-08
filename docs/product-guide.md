@@ -16,7 +16,9 @@
 
 > "创建期次 Q3,目标上线会议室预订"
 
-(也可以敲:`specprot iteration create -n 期次-Q3 -p web,backend`)
+(也可以敲:`specprot iteration create -n 期次-Q3 -p "web=网页端,backend=后端服务"`)
+
+**端名小贴士**:各端目录叫什么,你自己定——英文为佳(如 `web` / `admin-web`),`=` 后面附中文说明,一眼就知道是哪端;和开发那边(SpecCore)名字对不上也没关系,建期次时加 `-m "web=admin-web"` 说明一下,冻结交付时会自动带上一张对照表。
 
 **在哪做**:AI 编程工具的对话框,或终端。
 

@@ -60,7 +60,7 @@ Per-platform analysis: distills a full seven-section requirement doc from platfo
 | Param | Meaning |
 | :--- | :--- |
 | `-i, --iteration` | Iteration name (required) |
-| `-p, --platform` | Target platform web/h5/miniapp/backend (required) |
+| `-p, --platform` | Target platform (names are product-owned, English preferred; `web=网页端` may carry a Chinese label) (required) |
 
 ### slice (alias sl)
 
@@ -109,10 +109,13 @@ Scheme branching: multi-option comparison + recommendation; at freeze the recomm
 
 Creating an iteration = building the workshop (material zones + per-platform requirement skeletons + unit directories + template area + delivery area).
 
+**Platform naming**: names are product-owned, English preferred (e.g. `web` / `admin-web` / `booking-service` — may match SpecCore project ids or not); attach Chinese labels with `=` (`web=网页端`). When names differ from SpecCore project ids, build the bridge with `-m`; freeze ships `PLATFORM_MAP.yaml` inside the delivery mirror.
+
 | Param | Meaning | Default |
 | :--- | :--- | :--- |
 | `-n, --name` | Iteration name, e.g. `iteration-2026-Q3` (required) | — |
-| `-p, --platforms` | Platforms involved, comma-separated | web |
+| `-p, --platforms` | Platforms involved, comma-separated (names product-owned; `web=网页端` may carry a Chinese label) | web |
+| `-m, --platform-map` | Platform name → SpecCore project id mapping (`web=admin-web,booking-service=booking-service`), shipped with the delivery mirror on freeze | — |
 | `-g, --goal` | Goal of this iteration | — |
 | `-f, --from` | Start date | — |
 | `-t, --to` | End date | — |

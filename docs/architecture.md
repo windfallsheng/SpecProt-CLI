@@ -78,6 +78,9 @@ AI 成文后写回约定路径,CLI 校验结构(占位符消失 + 长度达标)�
 ├── .speccore/GLOBAL/            ← 全局需求层(单一事实源)
 │   ├── INDEX.md                 ← 全量需求索引表
 │   ├── RISK_LENSES/             ← 风险透镜库(七种子)
+│   ├── DESIGN_SYSTEM.yaml       ← 设计系统(design 默认落点,跨期次共用)
+│   ├── STYLE_GUIDE.html         ← 设计风格指南可视化
+│   ├── GLOSSARY.md              ← 全局术语表(analyze/slice 参考注入)
 │   └── {项目}/REQ-NNN.md        ← 正典需求(带版本号)
 │
 └── 期次-XXX/                    ← 期次车间

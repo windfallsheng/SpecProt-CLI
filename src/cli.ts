@@ -42,7 +42,7 @@ program
   .alias('az')
   .description('端级分析 — 从端素材提炼完整需求文档（AI 接力）')
   .requiredOption('-i, --iteration <name>', '期次名称')
-  .requiredOption('-p, --platform <platform>', '目标端: web/h5/miniapp/backend')
+  .requiredOption('-p, --platform <platform>', '目标端名（建期次时声明的端名，如 web / admin-web）')
   .action(async (options) => {
     const { analyzeCommand } = await import('./commands/analyze');
     await analyzeCommand(options);
@@ -55,7 +55,7 @@ program
   .alias('sl')
   .description('端内功能切分 — 端级需求切分为功能单元（AI 接力 + 素材溯源）')
   .requiredOption('-i, --iteration <name>', '期次名称')
-  .requiredOption('-p, --platform <platform>', '目标端: web/h5/miniapp/backend')
+  .requiredOption('-p, --platform <platform>', '目标端名（建期次时声明的端名，如 web / admin-web）')
   .action(async (options) => {
     const { sliceCommand } = await import('./commands/slice');
     await sliceCommand(options);
@@ -128,7 +128,8 @@ iterationCmd
   .alias('cr')
   .description('创建新期次（加工车间：素材区 + 各端需求文档 + 功能单元目录）')
   .requiredOption('-n, --name <name>', '期次名称，如: 期次-2026-Q3')
-  .option('-p, --platforms <list>', '涉及端: web,h5,miniapp,backend (逗号分隔)', 'web')
+  .option('-p, --platforms <list>', '涉及端（端名自定，逗号分隔；可带中文标签如 web=网页端）', 'web')
+  .option('-m, --platform-map <map>', '端名 → SpecCore 工程标识映射: web=admin-web,backend=booking-service')
   .option('-g, --goal <goal>', '本期目标')
   .option('-f, --from <date>', '开始日期')
   .option('-t, --to <date>', '结束日期')
@@ -245,7 +246,8 @@ program
   .command('prototype')
   .alias('pt')
   .description('从需求文档生成 HTML 原型')
-  .option('-i, --iteration <name>', '指定期次（Q1/Q2...），留空为全局层')
+  .option('-i, --iteration <name>', '指定期次（读期次内端级需求文档）')
+  .option('-p, --platform <name>', '期次内端名（默认读平台行第一个端）')
   .option('-f, --file <path>', '需求文档路径（覆盖默认路径）')
   .option('-o, --output <dir>', '输出目录（覆盖默认目录）')
   .action(async (options) => {

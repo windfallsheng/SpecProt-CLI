@@ -14,6 +14,7 @@
 
 import { ensureDir, writeFile, readFile, pathExists, readdir, copy, stat } from 'fs-extra';
 import { join, basename } from 'path';
+import { parsePlatformTokens, platformLabel, platformNamesFrom } from './workspace-manager';
 
 // ============================================================
 // 类型定义
@@ -65,8 +66,10 @@ export interface IterationInfo {
   from: string;         // 开始日期
   to: string;           // 结束日期
   status: string;
-  /** 涉及端列表（加工车间模式：预建各端素材目录与需求文档骨架） */
+  /** 涉及端列表（端名产品自定：`web=网页端` 语法可带中文标签；加工车间按声明预建目录） */
   platforms?: string[];
+  /** 端名 → SpecCore 工程标识映射（`web=admin-web,backend=booking-service`），冻结时随交付镜像走 */
+  platformMap?: string;
 }
 
 // ============================================================
@@ -87,10 +90,6 @@ function getIndexPath(): string {
 
 function getIterationDir(name: string): string {
   return join(process.cwd(), name);
-}
-
-function getIterationReqDir(name: string): string {
-  return join(getIterationDir(name), '00-需求文档');
 }
 
 // ============================================================
@@ -339,15 +338,17 @@ export async function createIteration(info: IterationInfo): Promise<string> {
     throw new Error(`期次已存在: ${info.name}`);
   }
 
-  const platforms = (info.platforms && info.platforms.length > 0 ? info.platforms : ['web']);
-  const platformLabels: Record<string, string> = { web: 'Web 端', h5: 'H5 端', miniapp: '小程序端', backend: '后端' };
+  // 端声明解析：`web=网页端,backend` → [{name,label?}]；未声明默认 web
+  const rawTokens = info.platforms && info.platforms.length > 0
+    ? parsePlatformTokens(info.platforms.join(','))
+    : [{ name: 'web' }];
+  const platforms = rawTokens.map((t) => t.name).filter(Boolean);
+  const labelOf = (name: string) => platformLabel(
+    name, rawTokens.find((t) => t.name === name)?.label
+  );
   const today = new Date().toISOString().split('T')[0];
 
-  // 创建目录结构
-  await ensureDir(join(iterDir, '00-需求文档'));
-  await ensureDir(join(iterDir, '01-原型'));
-  await ensureDir(join(iterDir, '02-图谱'));
-  await ensureDir(join(iterDir, '03-评审'));
+  // 创建目录结构（交付目录由 freeze 填充）
   await ensureDir(join(iterDir, '04-交付'));
 
   // ===== 加工车间结构 =====
@@ -371,6 +372,7 @@ export async function createIteration(info: IterationInfo): Promise<string> {
 > 把材料扔进对应的端目录，跨端通用的（业务规则、全局字段）扔进 shared/：
 >
 > - ${platforms.map(p => `\`${p}/\``).join(' ')} ← 各端素材（讨论记录、截图、参考文档）
+> - 端目录名建议用英文（如 web / admin-web），中文标签写在期次 README 的「平台」行
 > - \`shared/\` ← 跨端通用素材（业务规则、数据模型、通用流程）
 > - \`converted/{端}/\` ← [自动生成] 该端 docx/pdf/xlsx 转换产物（与端目录一一对应）
 > - \`converted/shared/\` ← [自动生成] shared 转换产物
@@ -400,7 +402,7 @@ export async function createIteration(info: IterationInfo): Promise<string> {
 
 ## 目录规则
 
-- 端专属模板放 \`{端}/\` 子目录（web / h5 / miniapp / backend），只影响该端；
+- 端专属模板放 \`{端}/\` 子目录（本期: ${platforms.join(' / ')}），只影响该端；
 - 放 \`_templates/\` 根级同名文件 = 所有端共用；
 - 匹配优先级：\`{端}/专属\` > \`根级共用\` > \`系统默认\`；
 - 模板只需给出章节结构（标题 + 一句话说明），AI 按结构成文；
@@ -410,7 +412,7 @@ export async function createIteration(info: IterationInfo): Promise<string> {
 
   // 各端需求文档骨架 + features 功能单元目录
   for (const platform of platforms) {
-    const platformLabel = platformLabels[platform] || platform;
+    const platformLabel = labelOf(platform);
     await ensureDir(join(iterDir, platform, 'features'));
     await writeFile(
       join(iterDir, platform, 'REQUIREMENT.md'),
@@ -482,13 +484,35 @@ _最后一次批量生成：—_
 > 跨端共享的业务规则和约束
 `
   );
+  // 端名映射桥（SpecProt 端名 → SpecCore 工程标识），冻结时随交付镜像走
+  {
+    const entries = (info.platformMap || '')
+      .split(',')
+      .map((kv) => kv.trim())
+      .filter(Boolean)
+      .map((kv) => {
+        const [k, v] = kv.split('=').map((x) => x.trim());
+        return { k, v };
+      })
+      .filter((e) => e.k && e.v);
+    const lines = entries.length > 0
+      ? entries.map((e) => `${e.k}: ${e.v}   # ${labelOf(e.k)} → ${e.v}`)
+      : platforms.map((p) => `# ${p}: ${p}   # 尚未映射到 SpecCore 工程标识，交接时补齐`);
+    await writeFile(
+      join(iterDir, '_shared', 'PLATFORM_MAP.yaml'),
+      `# 端名映射桥 — SpecProt 端名 → SpecCore 工程标识（CONSTITUTION.md 端列表）
+# 冻结时本文件随交付镜像走，SpecCore 侧 doc2spec/unitize 可按映射对齐端。
+${lines.join('\n')}
+`
+    );
+  }
 
   // README.md
   await writeFile(join(iterDir, 'README.md'), `# ${info.name}
 
 > 目标：${info.goal}
 > 时间：${info.from || '未指定'} ~ ${info.to || '未指定'}
-> 平台：${platforms.join(', ')}
+> 平台：${rawTokens.map((t) => (t.label ? `${t.name}(${t.label})` : t.name)).join(', ')}
 > 状态：🔄 进行中
 
 ## 本期需求
@@ -759,13 +783,13 @@ function buildRecommendedBlock(schemesContent: string, recommendedIds: string[])
  * 素材截图 → assets/screenshots/（重名加端前缀）；转换产物 → converted/（根级 + 各端）
  * 冻结后 04-交付/ 可整目录复制到 SpecCore 的 010-requirements/，外链不丢。
  */
-async function collectDeliveryAssets(iterDir: string, deliveryDir: string): Promise<void> {
+async function collectDeliveryAssets(iterDir: string, deliveryDir: string, platforms: string[]): Promise<void> {
   const copyOne = async (src: string, dest: string): Promise<void> => {
     if (await pathExists(src)) await copy(src, dest);
   };
 
-  // 1. 各端功能单元资产：原型 HTML / 图 .mmd
-  for (const pf of ['web', 'h5', 'miniapp', 'backend'] as const) {
+  // 1. 各端功能单元资产：原型 HTML / 图 .mmd（端名按期次声明动态）
+  for (const pf of platforms) {
     const featuresDir = join(iterDir, pf, 'features');
     if (!(await pathExists(featuresDir))) continue;
     for (const f of await readdir(featuresDir)) {
@@ -792,7 +816,7 @@ async function collectDeliveryAssets(iterDir: string, deliveryDir: string): Prom
   }
 
   // 2. 素材截图 → assets/screenshots/（重名加端前缀）
-  for (const pf of ['web', 'h5', 'miniapp', 'backend', 'shared'] as const) {
+  for (const pf of [...platforms, 'shared']) {
     const matDir = join(iterDir, '00-素材', pf);
     if (!(await pathExists(matDir))) continue;
     for (const f of await readdir(matDir)) {
@@ -820,7 +844,7 @@ async function collectDeliveryAssets(iterDir: string, deliveryDir: string): Prom
         }
       } catch { /* 目录跳过 */ }
     }
-    for (const pf of ['web', 'h5', 'miniapp', 'backend', 'shared'] as const) {
+    for (const pf of [...platforms, 'shared']) {
       const convPf = join(convSrc, pf);
       if (!(await pathExists(convPf))) continue;
       for (const f of await readdir(convPf)) {
@@ -840,10 +864,17 @@ export async function freezeIteration(name: string, opts: { force?: boolean } = 
     throw new Error(`期次不存在: ${name}`);
   }
 
+  // 端列表：按期次 README 平台行解析（端名产品自定，冻结门禁/资产镜像按此扫描）
+  const readmeRaw = await readFile(readmePath, 'utf-8');
+  const platMatch = readmeRaw.match(/>\s*平台[:：]\s*(.+)/);
+  const platforms = platMatch
+    ? platformNamesFrom(platMatch[1])
+    : [];
+
   // v0.3.1: 冻结门禁 — 风险未裁决 / 待确认未决 不可冻结（--force 跳过）
   if (!opts.force) {
     const gates: string[] = [];
-    for (const pf of ['web', 'h5', 'miniapp', 'backend'] as const) {
+    for (const pf of platforms) {
       const featuresDir = join(iterDir, pf, 'features');
       if (!(await pathExists(featuresDir))) continue;
       for (const f of await readdir(featuresDir)) {
@@ -966,7 +997,13 @@ export async function freezeIteration(name: string, opts: { force?: boolean } = 
   }
 
   // v0.3.2: 资产交付镜像（原型/图/截图/转换产物 → SpecCore 同构目录）
-  await collectDeliveryAssets(iterDir, deliveryDir);
+  await collectDeliveryAssets(iterDir, deliveryDir, platforms);
+
+  // 端名映射桥随交付镜像走（SpecProt 端名 → SpecCore 工程标识）
+  const mapSrc = join(iterDir, '_shared', 'PLATFORM_MAP.yaml');
+  if (await pathExists(mapSrc)) {
+    await copy(mapSrc, join(deliveryDir, 'PLATFORM_MAP.yaml'));
+  }
 
   // 交接说明
   const rows = copied
@@ -993,6 +1030,7 @@ ${rows}
    - \`assets/prototypes/\` → 原型 HTML（按单元子目录）
    - \`assets/designs/\` → Mermaid 图源 .mmd（按单元子目录）
    - \`assets/screenshots/\` → 参考截图（重名加端前缀）
+   - \`PLATFORM_MAP.yaml\` → 端名映射桥（SpecProt 端名 → SpecCore 工程标识），unitize 前按映射对齐端
 2. 在 SpecCore 中执行 \`speccore unitize\` 完成需求切分
 3. 每个快照文件头部的 SPECPROT-SNAPSHOT 元数据记录了来源与冻结信息，便于追溯
 `
@@ -1035,6 +1073,52 @@ export async function ensureGlobalLayer(): Promise<void> {
   await ensureDir(globalDir);
   await ensureDir(join(globalDir, 'PROJECTS'));
 
+  // 风格资产居所（存在即注入 analyze/slice 参考上下文；design 命令维护）
+  const dsPath = join(globalDir, 'DESIGN_SYSTEM.yaml');
+  if (!(await pathExists(dsPath))) {
+    await writeFile(dsPath, `# 设计系统（全局风格资产 — 权威居所）
+# 维护: \`specprot design\`（六种方式提取） / 手动编辑
+# 消费: analyze/slice 参考上下文注入 + prototype 渲染
+source: 默认
+colors:
+  primary: '#1677ff'
+  danger: '#ff4d4f'
+  success: '#52c41a'
+  warning: '#faad14'
+  background: '#f5f5f5'
+  text: '#333'
+  textSecondary: '#666'
+  border: '#e8e8e8'
+typography:
+  fontFamily: system-ui
+  fontSize: 14px
+  headingSize: 18px
+spacing:
+  base: 8px
+  small: 4px
+  medium: 16px
+  large: 24px
+components:
+  borderRadius: 8px
+  buttonRadius: 6px
+  buttonPadding: 8px 20px
+  cardShadow: 0 2px 8px rgba(0,0,0,0.08)
+  inputHeight: 36px
+`);
+  }
+  const glossaryPath = join(globalDir, 'GLOSSARY.md');
+  if (!(await pathExists(glossaryPath))) {
+    await writeFile(glossaryPath, `# 全局术语表
+
+> 跨期次复用的术语与口径（正典级）。deepen 的 REBOUND 回流先落期次 _shared/GLOSSARY.md，
+> 被 2+ 期次复用后准入本表；analyze/slice 生成需求时自动注入参考。
+
+| 术语 | 定义 | 来源 |
+| :--- | :--- | :--- |
+| _暂无术语_ | - | - |
+`);
+  }
+
   const indexPath = getIndexPath();
   if (await pathExists(indexPath)) return;
 
@@ -1069,4 +1153,4 @@ export async function ensureGlobalLayer(): Promise<void> {
 `);
 }
 
-export { getGlobalDir, getIndexPath, getIterationDir, getIterationReqDir };
+export { getGlobalDir, getIndexPath, getIterationDir };

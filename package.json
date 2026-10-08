@@ -1,6 +1,6 @@
 {
   "name": "spec-prot",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "需求定稿工坊（产品底座）— 素材 → 六段 → 冻结交付镜像，与 SpecCore 交接",
   "main": "dist/cli.js",
   "bin": {

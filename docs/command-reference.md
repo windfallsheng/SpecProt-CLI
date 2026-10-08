@@ -60,7 +60,7 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 | 参数 | 说明 |
 | :--- | :--- |
 | `-i, --iteration` | 期次名称(必填) |
-| `-p, --platform` | 目标端 web/h5/miniapp/backend(必填) |
+| `-p, --platform` | 目标端(端名产品自定,英文为佳;`web=网页端` 可带中文标签)(必填) |
 
 ### slice(别名 sl)
 
@@ -109,10 +109,13 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 
 创建期次 = 建加工车间(素材区 + 各端需求骨架 + 单元目录 + 模板区 + 交付区)。
 
+**端名规范**:端名产品自控,英文为佳(如 `web` / `admin-web` / `booking-service`,可与 SpecCore 工程标识一致,也可不同);中文标签用 `=` 附带(`web=网页端`)。与 SpecCore 工程标识不一致时用 `-m` 建映射桥,freeze 时随交付镜像输出 `PLATFORM_MAP.yaml`。
+
 | 参数 | 说明 | 默认 |
 | :--- | :--- | :--- |
 | `-n, --name` | 期次名称,如`期次-2026-Q3`(必填) | — |
-| `-p, --platforms` | 涉及端,逗号分隔 | web |
+| `-p, --platforms` | 涉及端,逗号分隔(端名自定,`web=网页端` 可带中文标签) | web |
+| `-m, --platform-map` | 端名 → SpecCore 工程标识映射(`web=admin-web,booking-service=booking-service`),冻结时随交付镜像走 | — |
 | `-g, --goal` | 本期目标 | — |
 | `-f, --from` | 开始日期 | — |
 | `-t, --to` | 结束日期 | — |

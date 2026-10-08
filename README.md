@@ -43,6 +43,16 @@ specprot run -i 期次-2026-Q3 -m interactive
 
 **六闸口**（无论哪种模式都会停）：范围确认、素材为空、空骨架拦截、待确认未清、风险未裁决、收养确认。
 
+**参考上下文** — `analyze` / `slice` 成文时自动注入既有沉淀（存在才注入，摘要而非全文，同端优先）：
+
+| 来源 | 内容 |
+| :--- | :--- |
+| 正典历史需求 | `.speccore/GLOBAL/{项目}/` 中同端既有 REQ 摘要（最多 5 条，不重复、不冲突） |
+| 期次共享契约 | `_shared/GLOSSARY.md` 术语表 + `RULES.md` 跨单元规则 |
+| 设计系统 | 期次根 `DESIGN_SYSTEM.yaml`（无则取全局层 `.speccore/GLOBAL/DESIGN_SYSTEM.yaml`） |
+
+AI 写需求因此「有前例可循」：新单元与历史重复或冲突时标注「待确认」，不擅自合并。
+
 ## 命令总览
 
 | 命令 | 职责 |
@@ -117,8 +127,18 @@ specprot run -i 期次-2026-Q3 -m interactive
 │       ├── REQUIREMENT.md
 │       └── assets/             ← 图源 .mmd + 原型 HTML + ASSETS.yaml
 ├── _shared/                    ← 跨端共享契约
+│   └── PLATFORM_MAP.yaml      ← [可选] 端名 → SpecCore 工程标识映射
 └── 04-交付/                    ← 冻结产出（整目录复制即交接）
 ```
+
+**端名规范** — 端名产品自控，英文为佳（如 `web` / `admin-web` / `booking-service`，可与 SpecCore 工程标识一致，也可不同）；中文标签用 `=` 附带：
+
+```bash
+specprot iteration create -n 期次-2026-Q4 -p "web=网页端,h5-mobile=移动端,booking-service" \
+  -m "web=admin-web,booking-service=booking-service"
+```
+
+`-m` 建映射桥，freeze 时随交付镜像输出 `PLATFORM_MAP.yaml`——SpecCore 拿到的永远是工程标识。
 
 ## 交付与交接 — 冻结即镜像
 

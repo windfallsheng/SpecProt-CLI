@@ -14,6 +14,8 @@ export interface IterationCreateOptions {
   from?: string;
   to?: string;
   platforms?: string;
+  /** 端名 → SpecCore 工程标识映射（web=admin-web,backend=booking-service） */
+  platformMap?: string;
 }
 
 export interface IterationFreezeOptions {
@@ -42,6 +44,7 @@ export async function iterationCreateCommand(options: IterationCreateOptions): P
       to: options.to || '',
       status: '🔄 进行中',
       platforms,
+      platformMap: options.platformMap,
     });
 
     console.log(`✅ 期次已创建: ${options.name}（加工车间已就绪）`);

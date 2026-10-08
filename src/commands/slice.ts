@@ -16,20 +16,16 @@ import {
   getPlatformFeaturesDir,
   collectMaterials,
   resolvePlatformTemplate,
+  platformLabel,
   Platform,
 } from '../core/workspace-manager';
+import { buildReferenceContext, formatReferenceSection, ReferenceContext } from '../core/reference-context';
 
 export interface SliceOptions {
   iteration: string;
   platform: string;
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  web: 'Web 端',
-  h5: 'H5 端',
-  miniapp: '小程序端',
-  backend: '后端',
-};
 
 export async function sliceCommand(options: SliceOptions): Promise<void> {
   if (!options.iteration || !options.platform) {
@@ -39,7 +35,7 @@ export async function sliceCommand(options: SliceOptions): Promise<void> {
   }
 
   const platform = options.platform as Platform;
-  const label = PLATFORM_LABELS[platform] || platform;
+  const label = platformLabel(platform);
   const taskDir = getWorkspaceDir(options.iteration);
 
   if (!(await pathExists(taskDir))) {
@@ -81,7 +77,10 @@ export async function sliceCommand(options: SliceOptions): Promise<void> {
   // 3. 产品模板解析（单元文档模板优先，系统默认兜底）
   const unitTemplate = await resolvePlatformTemplate(options.iteration, platform, 'UNIT_REQUIREMENT.md');
 
-  // 4. 组装切分 prompt
+  // 4. 参考上下文（正典同端历史需求摘要 + 术语表/规则 + 设计系统 + 端名映射桥）
+  const reference = await buildReferenceContext(options.iteration, platform);
+
+  // 5. 组装切分 prompt
   const prompt = buildSlicePrompt({
     iterationName: options.iteration,
     platform,
@@ -91,6 +90,7 @@ export async function sliceCommand(options: SliceOptions): Promise<void> {
     indexPath,
     materialFiles,
     unitTemplate,
+    reference,
   });
 
   console.log('[SPECPROT_PROMPT]');
@@ -136,6 +136,7 @@ function buildSlicePrompt(ctx: {
   indexPath: string;
   materialFiles: string[];
   unitTemplate: { path: string; content: string } | null;
+  reference: ReferenceContext;
 }): string {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
   let p = `# 期次: ${ctx.iterationName} — ${ctx.label}功能切分\n\n`;
@@ -154,7 +155,12 @@ function buildSlicePrompt(ctx: {
   p += `5. **素材溯源必填**：单元文档的溯源段列出该单元涉及的原始素材文件，端级素材清单见下\n`;
   p += `6. **跨端内容标引用**：涉及 _shared/ 的业务规则、数据模型，只写引用不复制内容\n`;
   p += `7. **不编造**：端级需求中没有的功能点不新增；端级需求疑似缺漏处，在单元文档「待确认」段列出\n`;
-  p += `8. **索引同步**：切分完成后填充 INDEX.md 清单表，每行记录单元名、概述、溯源素材\n\n`;
+  p += `8. **索引同步**：切分完成后填充 INDEX.md 清单表，每行记录单元名、概述、溯源素材\n`;
+  p += `9. **对照历史需求**（下方「参考上下文」节）：新功能单元若与同端历史 REQ 重复或冲突，必须在该单元文档「待确认」段标注，不擅自合并\n\n`;
+
+  // 参考上下文（既有沉淀:历史需求 / 术语表 / 共享规则 / 设计系统 / 端名映射桥）
+  p += formatReferenceSection(ctx.reference, ctx.label);
+
 
   p += `## 单元文档模板\n\n`;
   if (ctx.unitTemplate) {

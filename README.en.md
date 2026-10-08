@@ -43,6 +43,16 @@ Or just talk to it: `specprot ask "create iteration Q3 for meeting room booking"
 
 **Six gates** (pause in either mode): scope confirmation, empty materials, empty skeleton, unresolved clarifications, unadjudicated risks, adoption confirmation.
 
+**Reference context** — `analyze` / `slice` automatically inject existing assets while writing requirements (only when present, summaries not full text, same platform first):
+
+| Source | Content |
+| :--- | :--- |
+| Canonical history | Summaries of same-platform REQs under `.speccore/GLOBAL/{project}/` (max 5; no duplication, no conflicts) |
+| Iteration shared contracts | `_shared/GLOSSARY.md` glossary + `RULES.md` cross-unit rules |
+| Design system | Iteration-root `DESIGN_SYSTEM.yaml` (falls back to global `.speccore/GLOBAL/DESIGN_SYSTEM.yaml`) |
+
+The AI thus writes with precedent: duplicate or conflicting units get a 「待确认」 note instead of silent merging.
+
 ## Command Map
 
 | Command | Role |
@@ -105,8 +115,18 @@ iteration-XXX/
 │       ├── REQUIREMENT.md
 │       └── assets/            ← diagram sources .mmd + prototype HTML + ASSETS.yaml
 ├── _shared/                   ← cross-platform shared contracts
+│   └── PLATFORM_MAP.yaml     ← [optional] platform name → SpecCore project id
 └── 04-交付/                   ← frozen output (copy the whole directory to hand off)
 ```
+
+**Platform naming** — names are product-owned, English preferred (e.g. `web` / `admin-web` / `booking-service` — may match SpecCore project ids or not); attach Chinese labels with `=`:
+
+```bash
+specprot iteration create -n iteration-2026-Q4 -p "web=网页端,h5-mobile=移动端,booking-service" \
+  -m "web=admin-web,booking-service=booking-service"
+```
+
+`-m` builds the bridge; freeze ships `PLATFORM_MAP.yaml` inside the delivery mirror — SpecCore always receives project ids.
 
 ## Delivery & Handoff — Freeze Is the Mirror
 

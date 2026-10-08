@@ -1,13 +1,15 @@
 /**
  * /prototype 命令 — 从需求文档生成 HTML 原型
- * 
- * 支持两层：
- *   全局层: specprot prototype → 读取 00-需求文档/REQUIREMENT.md → 输出 prototypes/
- *   期次层: specprot prototype -i Q1 → 读取 期次-Q1/00-需求文档/ → 输出 期次-Q1/01-原型/
+ *
+ * 支持两种入口：
+ *   期次层: specprot prototype -i Q1 [-p web] → 读取 期次-Q1/{端}/REQUIREMENT.md
+ *           → 输出 期次-Q1/{端}/assets/prototypes/（冻结时随交付镜像走）
+ *   任意文档: specprot prototype -f REQUIREMENT.md → 输出默认 prototypes/（-o 覆盖）
  */
 import { readFile, writeFile, ensureDir, pathExists, readdir } from 'fs-extra';
 import { join } from 'path';
 import { parseRequirement, renderHTML } from '../engines/prototype';
+import { platformNamesFrom } from '../core/workspace-manager';
 
 export async function prototypeCommand(options: any) {
   const iteration = options.iteration || '';
@@ -16,20 +18,31 @@ export async function prototypeCommand(options: any) {
 
   // 确定工作目录
   if (iteration) {
-    // 期次层：自动查找迭代目录
+    // 期次层：自动查找迭代目录，端名 = --platform 或期次平台行第一个端
     const iterDir = await findIterationDir(iteration);
     if (!iterDir) {
       console.error(`❌ 未找到期次目录: 期次-${iteration}`);
       process.exit(1);
     }
-    reqFile = join(iterDir, '00-需求文档', 'REQUIREMENT.md');
-    outputDir = join(iterDir, '01-原型');
-    console.log(`📍 期次: ${iteration}`);
+    const platform = options.platform || await firstPlatform(iterDir);
+    if (!platform) {
+      console.error(`❌ 期次未声明端名（README 平台行为空）。`);
+      console.error(`   请用 -p 指定端名: specprot prototype -i ${iteration} -p web`);
+      process.exit(1);
+    }
+    reqFile = join(iterDir, platform, 'REQUIREMENT.md');
+    outputDir = join(iterDir, platform, 'assets', 'prototypes');
+    console.log(`📍 期次: ${iteration} / ${platform}`);
   } else {
-    // 全局层
-    reqFile = join('00-需求文档', 'REQUIREMENT.md');
-    outputDir = 'prototypes';
-    console.log('📍 全局层');
+    // 任意文档入口：必须 -f 指定需求文档
+    if (!options.file) {
+      console.error('❌ 未指定需求文档。请用 -f 指定: specprot prototype -f REQUIREMENT.md');
+      console.error('   或指定期次读取期次内端级需求: specprot prototype -i 期次-2026-Q3');
+      process.exit(1);
+    }
+    reqFile = options.file;
+    outputDir = options.output || 'prototypes';
+    console.log('📍 单文档模式');
   }
 
   // 支持 --file 覆盖
@@ -82,6 +95,19 @@ export async function prototypeCommand(options: any) {
 }
 
 /**
+ * 期次平台行第一个端名（`> 平台: web(网页端), backend` → 'web'）
+ */
+async function firstPlatform(iterDir: string): Promise<string | null> {
+  const readmePath = join(iterDir, 'README.md');
+  if (!(await pathExists(readmePath))) return null;
+  const content = await readFile(readmePath, 'utf-8');
+  const m = content.match(/>\s*平台[:：]\s*(.+)/);
+  if (!m) return null;
+  const names = platformNamesFrom(m[1]);
+  return names.length > 0 ? names[0] : null;
+}
+
+/**
  * 查找期次目录（ID 或名称匹配）
  */
 async function findIterationDir(iteration: string): Promise<string | null> {
@@ -104,6 +130,7 @@ async function findIterationDir(iteration: string): Promise<string | null> {
  */
 async function loadDesignSystem(): Promise<any | null> {
   const paths = [
+    '.speccore/GLOBAL/DESIGN_SYSTEM.yaml',
     '.speccore/DESIGN_SYSTEM.yaml',
     '.speccore/config/design-system.yaml',
     'DESIGN_SYSTEM.yaml',

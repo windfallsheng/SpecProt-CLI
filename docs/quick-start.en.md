@@ -19,10 +19,12 @@ Initializes two things: the in-project `.speccore/GLOBAL/` global requirement la
 ## 3. Create an iteration
 
 ```bash
-specprot iteration create -n iteration-2026-Q3 -p web,backend -g "launch meeting room booking"
+specprot iteration create -n iteration-2026-Q3 -p "web=网页端,backend=后端服务" -m "web=admin-web,backend=booking-service" -g "launch meeting room booking"
 ```
 
 One command builds the **workshop**: material zones (per platform + shared + converted), per-platform requirement skeletons, functional unit directories, the template area, and the delivery area.
+
+> **Platform naming**: names are product-owned, English preferred; attach a Chinese label with `=`. When they differ from SpecCore project ids, build the bridge with `-m` — freeze ships `PLATFORM_MAP.yaml` inside the delivery mirror, so SpecCore always receives project ids.
 
 ## 4. Drop in materials
 

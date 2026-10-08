@@ -19,10 +19,12 @@ specprot init
 ## 3. 创建期次
 
 ```bash
-specprot iteration create -n 期次-2026-Q3 -p web,backend -g "上线会议室预订"
+specprot iteration create -n 期次-2026-Q3 -p "web=网页端,backend=后端服务" -m "web=admin-web,backend=booking-service" -g "上线会议室预订"
 ```
 
 一条命令建出**加工车间**:素材区(按端归类 + shared + converted)、各端需求文档骨架、功能单元目录、产品模板区、交付区。
+
+> **端名自定**:端名英文为佳,`=` 后附中文标签即可;与 SpecCore 工程标识不一致时用 `-m` 建映射,freeze 时随交付镜像输出 `PLATFORM_MAP.yaml`,SpecCore 拿到的永远是工程标识。
 
 ## 4. 投料
 
