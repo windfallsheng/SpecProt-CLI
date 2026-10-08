@@ -9,7 +9,7 @@ SpecProt(finalize) → SpecCore(spec & dev) → SpecTest(verify)
 
 The product team does exactly three things: **create an iteration, drop in materials, run the pipeline**. Everything else — extraction, writing, slicing, deepening, diagram assets, risk adjudication — is handled by the pipeline and AI handoff.
 
-> 📖 For product folks: [docs/product-guide.en.md](docs/product-guide.en.md) — the zero-tech guide; every step tells you how to do it, where to do it, and what you will get.
+> 📖 For product folks: [docs/product-guide.en.md](docs/product-guide.en.md) — the full-journey handbook (install → create → materials → pipeline → check-up → prototype → design system → canon → handoff); every step tells you how, where, and what you get.
 
 ## Quick Start (Three Steps)
 
@@ -169,7 +169,7 @@ node dist/cli.js --help   # list commands
 
 | Doc | Content |
 | :--- | :--- |
-| [docs/product-guide.en.md](docs/product-guide.en.md) | **Product folks start here** — zero-tech guide (how / where / what you get) |
+| [docs/product-guide.en.md](docs/product-guide.en.md) | **Product folks start here** — full-journey handbook (install / create / materials / pipeline / check-up / prototype / design system / canon / handoff) |
 | [docs/quick-start.en.md](docs/quick-start.en.md) | Install and your first iteration, end to end |
 | [docs/command-reference.en.md](docs/command-reference.en.md) | Complete reference for all 22 commands |
 | [docs/scenarios.en.md](docs/scenarios.en.md) | Typical usage scenarios |
