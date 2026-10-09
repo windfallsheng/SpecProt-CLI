@@ -21,6 +21,11 @@ export type ProductIntent =
   | 'iteration_create'  // 创建期次
   | 'iteration_list'    // 查看期次
   | 'iteration_freeze'  // 冻结期次
+  | 'export_docs'       // 需求快照转 Word/HTML/PDF
+  | 'resolve'           // 风险裁决（清零冻结门禁）
+  | 'deepen'            // 需求深化（AI 接力）
+  | 'assets'            // 资产生成（AI 接力）
+  | 'schemes'           // 方案分叉（AI 接力）
   | 'req_new'           // 新建需求
   | 'req_list'          // 查看需求
   | 'req_status'        // 更新需求状态
@@ -142,6 +147,52 @@ const PRODUCT_COMMAND_MAPPINGS: CommandMapping[] = [
     example: 'specprot iteration freeze --name "期次-2026-Q3"',
   },
   // —— 需求管理 ——
+  {
+    id: 'export',
+    intent: 'export_docs',
+    priority: 66,
+    triggers: ['转格式', '转成 Word', '转成 word', '导出 Word', '转 PDF', '转 pdf',
+               '转 docx', '转换文档', '格式转换', '转word', '转成PDF'],
+    patterns: ['(.+)转成 Word', '(.+)转成 word', '导出(.+)Word', '转换(.+)文档格式'],
+    description: '格式转换 — 已导出的需求快照转 Word/HTML/PDF（先 freeze 后 export）',
+    example: 'specprot export -i 期次-2026-Q3 -f docx',
+  },
+  {
+    id: 'resolve',
+    intent: 'resolve',
+    priority: 65,
+    triggers: ['风险裁决', '裁决风险', '风险怎么处理', '待裁决', '裁决'],
+    patterns: ['裁决(.+)风险', '(.+)风险裁决', '裁决(.+)'],
+    description: '风险裁决 — 逐条裁决 RISK 待裁决与 CLARIFY 未决，清零冻结门禁',
+    example: 'specprot resolve -i 期次-2026-Q3 -p web -f 预订',
+  },
+  {
+    id: 'deepen',
+    intent: 'deepen',
+    priority: 64,
+    triggers: ['深化需求', '深挖', '深化', '需求深化', '评审包', '加深'],
+    patterns: ['深化(.+)需求', '(.+)需求深化'],
+    description: '需求深化 — OUTLINE 结构契约 → 评审包（RISK + CLARIFY + REBOUND）',
+    example: 'specprot deepen -i 期次-2026-Q3 -p web -f 预订',
+  },
+  {
+    id: 'assets',
+    intent: 'assets',
+    priority: 63,
+    triggers: ['生成图表', '生成资产', '画图', '生成图', '资产生成', '生成架构图'],
+    patterns: ['(.+)生成图表', '给(.+)画图', '(.+)生成资产'],
+    description: '资产生成 — 图（Mermaid）+ 原型 HTML + ASSETS.yaml 注册表',
+    example: 'specprot assets -i 期次-2026-Q3 -p web -f 预订',
+  },
+  {
+    id: 'schemes',
+    intent: 'schemes',
+    priority: 62,
+    triggers: ['方案对比', '多方案', '方案分叉', '出几个方案', '多个方案', '方案比较'],
+    patterns: ['(.+)方案对比', '(.+)出几个方案', '(.+)方案分叉'],
+    description: '方案分叉 — 多案对比 + 推荐圈选（冻结时推荐进正文，其余进备选附录）',
+    example: 'specprot schemes -i 期次-2026-Q3 -p web -f 预订',
+  },
   {
     id: 'req-new',
     intent: 'req_new',
@@ -291,8 +342,11 @@ function extractProductParams(input: string, mapping: CommandMapping): Record<st
     if (!params.name) params.name = quoted[1];
   }
 
-  // 提取期次名
-  const iterMatch = input.match(/期次[：:\s]*([^\s,，]+)/);
+  // 提取期次名：优先紧凑形「期次-XXX / 期次XXX」（字母数字连字符，
+  // 避免「期次-D的需求转成」被整段吞掉），再兜底旧正则
+  const iterMatch =
+    input.match(/期次[-：:\s]*([A-Za-z0-9_-]+)/) ||
+    input.match(/期次[：:\s]*([^\s,，]+)/);
   if (iterMatch) {
     params.iteration = iterMatch[1];
   }
@@ -358,6 +412,11 @@ export function getIntentLabel(intent: ProductIntent): string {
     iteration_create: '📅 创建期次',
     iteration_list: '📋 查看期次',
     iteration_freeze: '🔒 冻结期次',
+    export_docs: '📄 转成 Word/PDF',
+    resolve: '⚖️ 风险裁决',
+    deepen: '📖 需求深化',
+    assets: '🎨 资产生成',
+    schemes: '🔀 方案分叉',
     req_new: '📝 新建需求',
     req_list: '📋 查看需求',
     req_status: '🏷️ 更新状态',

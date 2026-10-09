@@ -8,7 +8,7 @@
  * CLI 管确定性（骨架预建、对比矩阵校验），AI 管语义（写方案段与对比矩阵）。
  */
 
-import { readFile, writeFile, pathExists, ensureDir } from 'fs-extra';
+import { readFile, writeFile, pathExists, ensureDir, readdir } from 'fs-extra';
 import { join } from 'path';
 import {
   getWorkspaceDir,
@@ -20,26 +20,52 @@ import {
 export interface SchemesOptions {
   iteration: string;
   platform: string;
-  feature: string;
+  feature?: string; // 缺省 = 该端全部单元
   yes?: boolean;
 }
 
 export async function schemesCommand(options: SchemesOptions): Promise<void> {
-  if (!options.iteration || !options.platform || !options.feature) {
-    console.error('❌ 期次名、端名、单元名是必需的。');
+  if (!options.iteration || !options.platform) {
+    console.error('❌ 期次名、端名是必需的。');
     console.error('   示例: specprot schemes -i 期次-XXX -p web -f 预订功能');
     return;
   }
 
   const platform = options.platform as Platform;
-  const label = PLATFORM_LABELS[platform] || platform;
-  const unitDir = join(getPlatformFeaturesDir(options.iteration, platform), options.feature);
+  const featuresDir = getPlatformFeaturesDir(options.iteration, platform);
+  const units = options.feature
+    ? [options.feature]
+    : (await pathExists(featuresDir))
+      ? (await readdir(featuresDir)).filter((f) => !f.startsWith('.') && f !== 'INDEX.md').sort()
+      : [];
 
-  if (!(await pathExists(join(unitDir, 'REQUIREMENT.md')))) {
-    console.error(`❌ 单元不存在: ${platform}/features/${options.feature}`);
+  if (units.length === 0) {
+    console.error(`❌ ${options.iteration} 的 ${platform} 端还没有功能单元（先 slice 切分）。`);
     return;
   }
 
+  let done = 0;
+  for (const feature of units) {
+    const unitDir = join(featuresDir, feature);
+    if (!(await pathExists(join(unitDir, 'REQUIREMENT.md')))) {
+      if (options.feature) console.error(`❌ 单元不存在: ${platform}/features/${feature}`);
+      continue;
+    }
+    await runForUnit(options.iteration, feature, platform);
+    done++;
+  }
+  console.log('');
+  console.log(`✅ 方案分叉完成: ${done} 个单元。产品圈选「推荐: Sx」后冻结: specprot iteration freeze -n ${options.iteration}`);
+}
+
+/** 单单元方案生成（-f 指定单单元 / 批量遍历共用） */
+async function runForUnit(
+  iterationName: string,
+  feature: string,
+  platform: Platform
+): Promise<void> {
+  const label = PLATFORM_LABELS[platform] || platform;
+  const unitDir = join(getPlatformFeaturesDir(iterationName, platform), feature);
   const outlinePath = join(unitDir, 'OUTLINE.md');
   const outline = (await pathExists(outlinePath)) ? await readFile(outlinePath, 'utf-8') : '（无结构契约，分叉点请按需求自行判断）';
   const req = await readFile(join(unitDir, 'REQUIREMENT.md'), 'utf-8');
@@ -47,11 +73,11 @@ export async function schemesCommand(options: SchemesOptions): Promise<void> {
 
   if (!(await pathExists(schemesPath))) {
     await ensureDir(unitDir);
-    await writeFile(schemesPath, schemesSkeleton(options.feature), 'utf-8');
+    await writeFile(schemesPath, schemesSkeleton(feature), 'utf-8');
   }
 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
-  let p = `# ${options.iteration} — ${label}/${options.feature} 方案分叉生成\n\n`;
+  let p = `# ${iterationName} — ${label}/${feature} 方案分叉生成\n\n`;
   p += `> 时间: ${now}\n`;
   p += `> 目标位置: ${schemesPath}（覆盖写入，保留模板表头）\n\n`;
   p += `## 方案要求\n\n`;
@@ -63,15 +89,15 @@ export async function schemesCommand(options: SchemesOptions): Promise<void> {
   p += `## 结构契约（分叉预判）\n\n\`\`\`markdown\n${outline}\n\`\`\`\n\n`;
   p += `## 单元需求\n\n\`\`\`markdown\n${req}\n\`\`\`\n`;
 
-  console.log(`🔀 方案分叉: ${options.iteration} / ${label} / ${options.feature}`);
+  console.log(`🔀 方案分叉: ${iterationName} / ${label} / ${feature}`);
   console.log('[SPECPROT_PROMPT]');
   console.log(p);
   console.log('[SPECPROT_PROMPT_END]');
-  console.log(`📌 宿主 AI 指令: 按 prompt 覆盖写入 ${join(options.iteration, platform, 'features', options.feature, 'SCHEMES.md')}`);
+  console.log(`📌 宿主 AI 指令: 按 prompt 覆盖写入 ${join(iterationName, platform, 'features', feature, 'SCHEMES.md')}`);
   console.log('');
   console.log('💡 产品圈选: 在 SCHEMES.md 修改「推荐: Sx」，冻结时推荐方案进快照正文，其余进备选附录。');
   console.log('[SPECPROT_STEP_DONE]');
-  console.log(`[SPECPROT_NEXT_STEP] 方案落盘后产品圈选推荐 → 冻结: specprot iteration freeze -n "${options.iteration}"`);
+  console.log(`[SPECPROT_NEXT_STEP] 方案落盘后产品圈选推荐 → 冻结: specprot iteration freeze -n "${iterationName}"`);
 }
 
 /** 解析 SCHEMES.md：提取方案段 + 推荐标记（供 freeze 集成消费，多消费点共用） */

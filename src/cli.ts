@@ -80,7 +80,7 @@ program
   .description('资产生成 — 图(Mermaid) + 原型 HTML + ASSETS.yaml 资产注册表')
   .requiredOption('-i, --iteration <name>', '期次名称')
   .requiredOption('-p, --platform <name>', '端名')
-  .requiredOption('-f, --feature <name>', '功能单元名')
+  .option('-f, --feature <name>', '功能单元名（缺省 = 该端全部单元）')
   .option('-k, --kind <kind>', '资产类型: diagrams / prototype / all', 'all')
   .action(async (options) => {
     const { assetsCommand } = await import('./commands/assets');
@@ -92,7 +92,7 @@ program
   .description('方案分叉 — 多案对比 + 推荐圈选（冻结时推荐进快照正文，其余进备选附录）')
   .requiredOption('-i, --iteration <name>', '期次名称')
   .requiredOption('-p, --platform <name>', '端名')
-  .requiredOption('-f, --feature <name>', '功能单元名')
+  .option('-f, --feature <name>', '功能单元名（缺省 = 该端全部单元）')
   .action(async (options) => {
     const { schemesCommand } = await import('./commands/schemes');
     await schemesCommand(options);
@@ -141,10 +141,40 @@ iterationCmd
 iterationCmd
   .command('list')
   .alias('ls')
-  .description('列出所有期次')
-  .action(async () => {
+  .description('列出所有期次（--detail 展示端/单元/素材总览）')
+  .option('--detail', '详细模式: 端列表 / 单元数 / 素材数')
+  .action(async (options) => {
     const { iterationListCommand } = await import('./commands/iteration');
-    await iterationListCommand();
+    await iterationListCommand(!!options.detail);
+  });
+
+iterationCmd
+  .command('show')
+  .description('期次详情: 状态 / 端 / 单元 / 需求 / 素材')
+  .requiredOption('-n, --name <name>', '期次名称')
+  .action(async (options) => {
+    const { iterationShowCommand } = await import('./commands/iteration');
+    await iterationShowCommand(options.name);
+  });
+
+iterationCmd
+  .command('rename')
+  .description('期次重命名（目录 + 索引 + 关联需求同步）')
+  .requiredOption('-n, --name <name>', '旧期次名')
+  .requiredOption('-t, --target <name>', '新期次名')
+  .action(async (options) => {
+    const { iterationRenameCommand } = await import('./commands/iteration');
+    await iterationRenameCommand(options);
+  });
+
+iterationCmd
+  .command('delete')
+  .description('删除期次（需 --yes 确认；关联需求解绑回未排期）')
+  .requiredOption('-n, --name <name>', '期次名称')
+  .option('-y, --yes', '确认删除')
+  .action(async (options) => {
+    const { iterationDeleteCommand } = await import('./commands/iteration');
+    await iterationDeleteCommand(options);
   });
 
 iterationCmd
@@ -173,6 +203,7 @@ reqCmd
   .option('-d, --desc <desc>', '需求描述')
   .option('-p, --project <project>', '所属项目', 'default')
   .option('-i, --iteration <name>', '关联期次')
+  .option('--platform <platform>', '所属端名（产品自定，如 web；按端导出与转换时归组用）')
   .action(async (options) => {
     const { reqNewCommand } = await import('./commands/requirement');
     await reqNewCommand(options);
@@ -246,7 +277,7 @@ reqCmd
 program
   .command('prototype')
   .alias('pt')
-  .description('从需求文档生成 HTML 原型')
+  .description('从需求文档生成 HTML 原型（期次内: -i 读端级需求；随手: -f 任意文档）')
   .option('-i, --iteration <name>', '指定期次（读期次内端级需求文档）')
   .option('-p, --platform <name>', '期次内端名（默认读平台行第一个端）')
   .option('-f, --file <path>', '需求文档路径（覆盖默认路径）')
@@ -273,7 +304,7 @@ program
 program
   .command('design')
   .alias('ds')
-  .description('提取/配置设计系统')
+  .description('提取/配置设计系统（原型的风格来源；与 prototype 分工: design 管风格，prototype 管页面）')
   .option('-s, --scan <dir>', '扫描本地代码工程目录')
   .option('-u, --url <url>', '线上页面 URL')
   .option('-c, --cookie <cookie>', '浏览器 Cookie')
@@ -290,14 +321,30 @@ program
 program
   .command('export')
   .alias('exp')
-  .description('导出本迭代需求为 Word/HTML/PDF（依赖 pandoc，输出到 04-交付/exports/）')
+  .description('转换已导出的需求为 Word/HTML/PDF（依赖 pandoc，输出到 {期次}/exports/）')
   .requiredOption('-i, --iteration <name>', '期次名称')
   .option('-p, --platforms <list>', '只导出这些端（逗号分隔），留空 = 全部端')
   .option('-f, --format <formats>', '目标格式，逗号分隔: docx / html / pdf', 'docx')
-  .option('-o, --output <dir>', '输出目录（默认 {期次}/04-交付/exports）')
+  .option('-o, --output <dir>', '输出目录（默认 {期次}/exports）')
   .action(async (options) => {
     const { exportCommand } = await import('./commands/export');
     await exportCommand(options);
+  });
+
+// ===== ⚖️ 风险裁决（清零冻结门禁） =====
+
+program
+  .command('resolve')
+  .description('裁决单元内 RISK.md 待裁决与 CLARIFY.md 未决，清零冻结门禁')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .requiredOption('-p, --platform <name>', '端名')
+  .requiredOption('-f, --feature <name>', '功能单元名')
+  .option('--item <n>', '待裁决项序号（缺省 = 仅列出清单）')
+  .option('--decision <d>', '裁决: accept / reject')
+  .option('--note <text>', '裁决理由')
+  .action(async (options) => {
+    const { resolveCommand } = await import('./commands/resolve');
+    await resolveCommand(options);
   });
 
 program

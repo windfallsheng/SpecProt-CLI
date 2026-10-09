@@ -12,7 +12,7 @@
  *             → 可选关联到期次
  */
 
-import { ensureDir, writeFile, readFile, pathExists, readdir, copy, stat } from 'fs-extra';
+import { ensureDir, writeFile, readFile, pathExists, pathExistsSync, readdir, copy, stat } from 'fs-extra';
 import { join, basename } from 'path';
 import { parsePlatformTokens, platformLabel, platformNamesFrom } from './workspace-manager';
 
@@ -89,7 +89,13 @@ function getIndexPath(): string {
 }
 
 function getIterationDir(name: string): string {
-  return join(process.cwd(), name);
+  // 定位策略与 check 命令对齐: 先直接用参数名，再补「期次-」前缀
+  // （ask 引擎提取的紧凑名如「D」需补前缀才能命中目录「期次-D」）
+  const direct = join(process.cwd(), name);
+  if (pathExistsSync(direct)) return direct;
+  const prefixed = join(process.cwd(), `期次-${name}`);
+  if (pathExistsSync(prefixed)) return prefixed;
+  return direct;
 }
 
 // ============================================================
@@ -181,7 +187,8 @@ export async function createRequirement(
   project: string,
   name: string,
   description: string,
-  iteration?: string
+  iteration?: string,
+  platform?: string
 ): Promise<ReqIndexEntry> {
   const index = await readGlobalIndex();
   const reqId = getNextReqId(index);
@@ -201,6 +208,7 @@ export async function createRequirement(
 > | 当前版本 | v1.0 |
 > | 状态 | 📝 草稿 |
 > | 关联期次 | ${iteration || '-'} |
+> | 所属端 | ${platform || '-'} |
 > | 创建日期 | ${today} |
 
 ## 需求描述
@@ -594,6 +602,24 @@ export async function linkReqToIteration(reqId: string, iteration: string): Prom
   // 更新全局索引中需求的期次字段
   await updateReqInIndex(reqId, { iteration });
 
+  // 同步期次关联表的「包含需求」列（iteration list / --detail 的统计口径依赖此列，
+  // 历史上只写需求表期次列导致期次表 reqs 恒为空）
+  const indexPath = getIndexPath();
+  const idxContent = await readFile(indexPath, 'utf-8');
+  const idxLines = idxContent.split('\n');
+  for (let i = 0; i < idxLines.length; i++) {
+    if (idxLines[i].includes(':---')) continue;
+    const cols = idxLines[i].split('|').map((c) => c.trim());
+    if (cols.length >= 5 && cols[1] === iteration) {
+      const existing = cols[2] && cols[2] !== '-' ? cols[2].split(',').map((r: string) => r.trim()).filter(Boolean) : [];
+      if (!existing.includes(reqId)) existing.push(reqId);
+      cols[2] = existing.join(', ');
+      idxLines[i] = `| ${cols[1]} | ${cols[2]} | ${cols[3]} | ${cols[4]} |`;
+      break;
+    }
+  }
+  await writeFile(indexPath, idxLines.join('\n'));
+
   // 更新期次 README 的需求表格
   const iterDir = getIterationDir(iteration);
   const readmePath = join(iterDir, 'README.md');
@@ -856,6 +882,14 @@ async function collectDeliveryAssets(iterDir: string, deliveryDir: string, platf
   }
 }
 
+/** 提取需求文件的端归属: 优先「来源功能单元」行(adopt 写入), 其次「所属端」行(req new 写入) */
+export function extractReqPlatform(content: string): string {
+  const srcMatch = content.match(/\| 来源功能单元 \| ([^|]+) \|/);
+  if (srcMatch) return srcMatch[1].trim().split('/')[0];
+  const pfMatch = content.match(/\| 所属端 \| ([^|]+) \|/);
+  return pfMatch ? pfMatch[1].trim() : '';
+}
+
 export async function freezeIteration(
   name: string,
   opts: { force?: boolean; platforms?: string[] } = {}
@@ -928,6 +962,12 @@ export async function freezeIteration(
     let reqContent = await readFile(src, 'utf-8');
     if (!reqContent.includes('变更发起')) continue;
 
+    // 按端冻结时，仅回流被选中端的变更（与快照过滤同口径，避免未冻结端被带出「已交付」版本）
+    if (opts.platforms && opts.platforms.length > 0) {
+      const srcPf = extractReqPlatform(reqContent);
+      if (!srcPf || !opts.platforms.includes(srcPf)) continue;
+    }
+
     // 版本演进 vX.Y → vX.(Y+1)
     const verMatch = reqContent.match(/\| 当前版本 \| v(\d+)\.(\d+) \|/);
     if (!verMatch) continue;
@@ -962,10 +1002,9 @@ export async function freezeIteration(
 
     const srcContent = await readFile(src, 'utf-8');
 
-    // 按端筛选（-p）：端归属取「来源功能单元」行，无端归属的需求跳过
+    // 按端筛选（-p）：端归属优先「来源功能单元」，其次「所属端」，无端归属的需求跳过
     if (opts.platforms && opts.platforms.length > 0) {
-      const pfMatch = srcContent.match(/\| 来源功能单元 \| ([^|]+) \|/);
-      const pfName = pfMatch ? pfMatch[1].trim().split('/')[0] : '';
+      const pfName = extractReqPlatform(srcContent);
       if (!pfName || !opts.platforms.includes(pfName)) continue;
     }
 

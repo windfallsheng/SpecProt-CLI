@@ -73,6 +73,11 @@ const REQUIRED_PARAMS: Record<string, string[]> = {
   'req-new': ['name'],
   'req-status': ['req', 'status'],
   'req-link': ['req', 'iteration'],
+  export: ['iteration'],
+  resolve: ['iteration', 'platform', 'feature'],
+  deepen: ['iteration', 'platform'],
+  assets: ['iteration', 'platform'],
+  schemes: ['iteration', 'platform'],
 };
 
 /** 参数中文名（提示用） */
@@ -92,6 +97,12 @@ async function executeHigh(result: ReturnType<typeof recognizeProductIntent>[0],
   // 补充提取：端名（web/h5/miniapp/backend）
   const pm = input.match(/(web|h5|miniapp|backend)/i);
   if (pm) params.platform = pm[1].toLowerCase();
+
+  // 补充提取：功能单元名（「预订功能」「支付单元」等名词）
+  if (!params.feature) {
+    const fm = input.match(/([\u4e00-\u9fa5A-Za-z0-9]+)(?:功能|单元|模块)/);
+    if (fm) params.feature = fm[1];
+  }
 
   // iteration-create / iteration-freeze 的 name 兜底（"创建期次 Q3" → iteration=Q3 → name=Q3）
   if (!params.name) params.name = params.iteration;
@@ -195,6 +206,31 @@ async function executeIntent(id: string, p: Record<string, any>): Promise<void> 
     case 'req-link': {
       const { reqLinkCommand } = await import('./requirement');
       await reqLinkCommand({ req: p.req, iteration: p.iteration });
+      break;
+    }
+    case 'export': {
+      const { exportCommand } = await import('./export');
+      await exportCommand({ iteration: p.iteration, platforms: p.platform, format: 'docx' });
+      break;
+    }
+    case 'resolve': {
+      const { resolveCommand } = await import('./resolve');
+      await resolveCommand({ iteration: p.iteration, platform: p.platform, feature: p.feature || p.name });
+      break;
+    }
+    case 'deepen': {
+      const { deepenCommand } = await import('./deepen');
+      await deepenCommand({ iteration: p.iteration, platform: p.platform, feature: p.feature || p.name });
+      break;
+    }
+    case 'assets': {
+      const { assetsCommand } = await import('./assets');
+      await assetsCommand({ iteration: p.iteration, platform: p.platform, feature: p.feature || p.name });
+      break;
+    }
+    case 'schemes': {
+      const { schemesCommand } = await import('./schemes');
+      await schemesCommand({ iteration: p.iteration, platform: p.platform, feature: p.feature || p.name });
       break;
     }
     default:

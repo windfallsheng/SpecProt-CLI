@@ -8,16 +8,19 @@
  *   - docx / html: pandoc 直接转
  *   - pdf: docx 中转后经 LibreOffice 转（需 brew install --cask libreoffice）
  *
- * 端归属: 需求文件中的「来源功能单元」行（{端}/features/{单元}）
+ * 端归属: 需求文件中的「来源功能单元」行 → 其次「所属端」行
  *   - 按端导出（-p）时据此过滤
  *   - 无端归属的需求归入「未归属端/」
+ *
+ * 素材附录: 04-交付/converted/{端}/ 的素材转换产物按端合并，
+ *   随需求文档一并转格式（输出「素材附录-{端}.{ext}」）
  */
 
 import { execSync } from 'child_process';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { ensureDir, pathExists, readFile, readdir, remove, writeFile } from 'fs-extra';
-import { getIterationDir } from '../core/global-layer';
+import { getIterationDir, extractReqPlatform } from '../core/global-layer';
 
 /** 支持的目标格式 → pandoc writer */
 const WRITER_MAP: Record<string, string> = {
@@ -33,12 +36,9 @@ export interface ExportOptions {
   output?: string;
 }
 
-/** 需求正文中的端归属（来源功能单元 → {端}/features/{单元}） */
+/** 需求正文中的端归属（与 freeze 快照/回流同口径: 来源功能单元 → 所属端） */
 function platformOf(content: string): string {
-  const m = content.match(/\| 来源功能单元 \| ([^|]+) \|/);
-  if (!m) return '';
-  const parts = m[1].trim().split('/');
-  return parts.length === 3 && parts[1] === 'features' ? parts[0].trim() : parts[0].trim();
+  return extractReqPlatform(content);
 }
 
 function hasTool(cmd: string): boolean {
@@ -51,29 +51,23 @@ function hasTool(cmd: string): boolean {
 }
 
 export async function exportCommand(options: ExportOptions): Promise<void> {
-  if (!options.iteration) {
-    console.error('❌ 请指定期次: specprot export -i <期次名>');
-    return;
-  }
   const iteration = options.iteration;
-  const formats = (options.format || 'docx')
-    .split(',')
-    .map((f) => f.trim().toLowerCase())
-    .filter(Boolean);
-  const bad = formats.filter((f) => !WRITER_MAP[f]);
-  if (bad.length > 0) {
-    console.error(`❌ 不支持的格式: ${bad.join(', ')}。支持: docx, html, pdf`);
+  if (!iteration) {
+    console.error('❌ 请指定期次名称: specprot export -i 期次名 -f docx,html');
     return;
   }
+  const iterDir = getIterationDir(iteration);
   const onlyPlatforms = options.platforms
     ? options.platforms.split(',').map((p) => p.trim()).filter(Boolean)
     : [];
+  const formats = (options.format || 'docx')
+    .split(',')
+    .map((f) => f.trim())
+    .filter((f) => Boolean(f) && Boolean(WRITER_MAP[f]));
 
   // ── 收集源需求（只读已导出的交付快照；导出是 freeze 的活，转换是这里的活） ──
-  const iterDir = getIterationDir(iteration);
   const sourcesDir = join(iterDir, '04-交付', 'sources');
   const sources: { file: string; content: string }[] = [];
-
   if (await pathExists(sourcesDir)) {
     for (const f of await readdir(sourcesDir)) {
       if (!f.endsWith('.md') || f === 'README.md' || f === '备选方案附录.md') continue;
@@ -117,10 +111,38 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
   if (formats.length === 0) return;
 
   // ── 转换 ──
-  const outBase = options.output || join(iterDir, '04-交付', 'exports');
+  const outBase = options.output || join(iterDir, 'exports');
   const tmpDir = join(tmpdir(), `specprot-export-${Date.now()}`);
   await ensureDir(tmpDir);
   const done: string[] = [];
+
+  // ── 素材附录收集（converted 按端合并，随需求文档一并转格式） ──
+  const appendix = new Map<string, string>();
+  const convertedBase = join(iterDir, '04-交付', 'converted');
+  for (const pf of byPlatform.keys()) {
+    if (pf === '未归属端') continue;
+    const convDir = join(convertedBase, pf);
+    if (!(await pathExists(convDir))) continue;
+    let body = '';
+    for (const f of (await readdir(convDir)).sort()) {
+      if (!f.endsWith('.md') || f === 'README.md') continue;
+      body += `\n\n---\n\n## 素材: ${f.replace(/\.md$/, '')}\n\n${await readFile(join(convDir, f), 'utf-8')}`;
+    }
+    if (body) appendix.set(pf, `# 素材原文附录 — ${pf}\n\n> 由 04-交付/converted/${pf}/ 合并，随需求文档一并转格式。\n${body}`);
+  }
+
+  /** 单文件转换（三种格式共用） */
+  const convertOne = async (fmt: string, tmpMd: string, pfDir: string, stem: string): Promise<void> => {
+    if (fmt === 'docx') {
+      execSync(`pandoc -f gfm -t docx -o "${join(pfDir, `${stem}.docx`)}" "${tmpMd}"`, { stdio: 'pipe' });
+    } else if (fmt === 'html') {
+      execSync(`pandoc -f gfm -t html5 -s -o "${join(pfDir, `${stem}.html`)}" "${tmpMd}"`, { stdio: 'pipe' });
+    } else if (fmt === 'pdf') {
+      const tmpDocx = join(tmpDir, `${stem}.docx`);
+      execSync(`pandoc -f gfm -t docx -o "${tmpDocx}" "${tmpMd}"`, { stdio: 'pipe' });
+      execSync(`soffice --headless --convert-to pdf --outdir "${pfDir}" "${tmpDocx}"`, { stdio: 'pipe' });
+    }
+  };
 
   try {
     for (const fmt of formats) {
@@ -134,20 +156,23 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
           const tmpMd = join(tmpDir, s.file);
           await writeFile(tmpMd, s.content);
           try {
-            if (fmt === 'docx') {
-              execSync(`pandoc -f gfm -t docx -o "${join(pfDir, `${stem}.docx`)}" "${tmpMd}"`, { stdio: 'pipe' });
-              done.push(`${fmt}/${pf}/${stem}.docx`);
-            } else if (fmt === 'html') {
-              execSync(`pandoc -f gfm -t html5 -s -o "${join(pfDir, `${stem}.html`)}" "${tmpMd}"`, { stdio: 'pipe' });
-              done.push(`${fmt}/${pf}/${stem}.html`);
-            } else if (fmt === 'pdf') {
-              const tmpDocx = join(tmpDir, `${stem}.docx`);
-              execSync(`pandoc -f gfm -t docx -o "${tmpDocx}" "${tmpMd}"`, { stdio: 'pipe' });
-              execSync(`soffice --headless --convert-to pdf --outdir "${pfDir}" "${tmpDocx}"`, { stdio: 'pipe' });
-              done.push(`${fmt}/${pf}/${stem}.pdf`);
-            }
+            await convertOne(fmt, tmpMd, pfDir, stem);
+            done.push(`${fmt}/${pf}/${stem}.${fmt === 'html' ? 'html' : fmt}`);
           } catch (err) {
             console.error(`⚠️ 转换失败 ${s.file}: ${(err as Error).message?.slice(0, 200)}`);
+          }
+        }
+        // 素材原文附录（converted 合并件）随需求一并转格式
+        const apx = appendix.get(pf);
+        if (apx) {
+          const stem = `素材附录-${pf}`;
+          const tmpMd = join(tmpDir, `${stem}.md`);
+          await writeFile(tmpMd, apx);
+          try {
+            await convertOne(fmt, tmpMd, pfDir, stem);
+            done.push(`${fmt}/${pf}/${stem}.${fmt === 'html' ? 'html' : fmt}`);
+          } catch (err) {
+            console.error(`⚠️ 转换失败 ${stem}.md: ${(err as Error).message?.slice(0, 200)}`);
           }
         }
       }

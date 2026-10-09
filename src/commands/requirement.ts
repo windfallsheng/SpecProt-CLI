@@ -24,6 +24,7 @@ export interface ReqNewOptions {
   desc?: string;
   project?: string;
   iteration?: string;
+  platform?: string;
 }
 
 export interface ReqLinkOptions {
@@ -50,10 +51,12 @@ export async function reqNewCommand(options: ReqNewOptions): Promise<void> {
       options.project || 'default',
       options.name,
       options.desc || '',
-      options.iteration
+      options.iteration,
+      options.platform
     );
 
     console.log(`✅ 需求已创建: ${entry.id} — ${entry.name}`);
+    if (options.platform) console.log(`📱 所属端: ${options.platform}`);
     console.log(`📁 .speccore/GLOBAL/${entry.filePath}`);
     if (options.iteration) {
       console.log(`🔗 已关联到期次: ${options.iteration}`);

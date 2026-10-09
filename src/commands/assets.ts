@@ -26,7 +26,7 @@ import {
 export interface AssetsOptions {
   iteration: string;
   platform: string;
-  feature: string;
+  feature?: string; // 缺省 = 该端全部单元
   kind?: string; // diagrams | prototype | all（默认 all）
   yes?: boolean;
 }
@@ -40,40 +40,65 @@ const PLATFORM_PROFILE: Record<Platform, string> = {
 };
 
 export async function assetsCommand(options: AssetsOptions): Promise<void> {
-  if (!options.iteration || !options.platform || !options.feature) {
-    console.error('❌ 期次名、端名、单元名是必需的。');
+  if (!options.iteration || !options.platform) {
+    console.error('❌ 期次名、端名是必需的。');
     console.error('   示例: specprot assets -i 期次-XXX -p web -f 预订功能');
     return;
   }
 
   const platform = options.platform as Platform;
-  const label = PLATFORM_LABELS[platform] || platform;
-  const unitDir = join(getPlatformFeaturesDir(options.iteration, platform), options.feature);
+  const kind = options.kind || 'all';
+  const featuresDir = getPlatformFeaturesDir(options.iteration, platform);
+  const units = options.feature
+    ? [options.feature]
+    : (await pathExists(featuresDir))
+      ? (await readdir(featuresDir)).filter((f) => !f.startsWith('.') && f !== 'INDEX.md').sort()
+      : [];
 
-  if (!(await pathExists(join(unitDir, 'REQUIREMENT.md')))) {
-    console.error(`❌ 单元不存在: ${platform}/features/${options.feature}`);
+  if (units.length === 0) {
+    console.error(`❌ ${options.iteration} 的 ${platform} 端还没有功能单元（先 slice 切分）。`);
     return;
   }
 
-  const kind = options.kind || 'all';
-  const assetsDir = join(getWorkspaceDir(options.iteration), platform, 'assets', options.feature);
+  let done = 0;
+  for (const feature of units) {
+    const unitDir = join(featuresDir, feature);
+    if (!(await pathExists(join(unitDir, 'REQUIREMENT.md')))) {
+      if (options.feature) console.error(`❌ 单元不存在: ${platform}/features/${feature}`);
+      continue;
+    }
+    await generateForUnit(options.iteration, feature, unitDir, platform, kind);
+    done++;
+  }
+  console.log('');
+  console.log(`✅ 资产清单已刷新: ${done} 个单元 → ${join(options.iteration, platform, 'assets')}`);
+}
+
+/** 单单元资产生成（-f 指定单单元 / 批量遍历共用） */
+async function generateForUnit(
+  iterationName: string,
+  feature: string,
+  unitDir: string,
+  platform: Platform,
+  kind: string
+): Promise<void> {
+  const label = PLATFORM_LABELS[platform] || platform;
+  const assetsDir = join(getWorkspaceDir(iterationName), platform, 'assets', feature);
   await ensureDir(assetsDir);
 
-  console.log(`🎨 资产生成: ${options.iteration} / ${label} / ${options.feature}\n`);
+  console.log(`🎨 资产生成: ${iterationName} / ${label} / ${feature}\n`);
 
   if (kind === 'diagrams' || kind === 'all') {
-    await runDiagrams(options.iteration, platform, label, options.feature, unitDir, assetsDir);
+    await runDiagrams(iterationName, platform, label, feature, unitDir, assetsDir);
   }
   if (kind === 'prototype' || kind === 'all') {
-    await runPrototype(options.iteration, platform, label, options.feature, unitDir, assetsDir);
+    await runPrototype(iterationName, platform, label, feature, unitDir, assetsDir);
   }
 
   // 确定性收尾：资产注册表 + 预览聚合页（每次重跑都刷新，与源文件保持同步）
   await writeAssetsRegistry(assetsDir);
-  await writeDiagramsPreview(assetsDir, options.feature);
-  await writePrototypeIndex(assetsDir, options.feature);
-  console.log('');
-  console.log(`✅ 资产清单已刷新: ${join(options.iteration, platform, 'assets', options.feature, 'ASSETS.yaml')}`);
+  await writeDiagramsPreview(assetsDir, feature);
+  await writePrototypeIndex(assetsDir, feature);
 }
 
 /** 图资产：OUTLINE 图清单 → .mmd 源 */
