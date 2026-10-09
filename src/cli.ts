@@ -152,6 +152,7 @@ iterationCmd
   .alias('fz')
   .description('冻结期次，禁止修改需求（风险未裁决/待确认未决时拦闸）')
   .requiredOption('-n, --name <name>', '期次名称')
+  .option('-p, --platforms <list>', '只冻结这些端（逗号分隔，端名产品自定），留空 = 全部端')
   .option('--force', '跳过冻结门禁（风险未裁决/待确认未决）', false)
   .action(async (options) => {
     const { iterationFreezeCommand } = await import('./commands/iteration');
@@ -284,6 +285,19 @@ program
   .action(async (options) => {
     const { designCommand } = await import('./commands/design');
     await designCommand(options);
+  });
+
+program
+  .command('export')
+  .alias('exp')
+  .description('导出本迭代需求为 Word/HTML/PDF（依赖 pandoc，输出到 04-交付/exports/）')
+  .requiredOption('-i, --iteration <name>', '期次名称')
+  .option('-p, --platforms <list>', '只导出这些端（逗号分隔），留空 = 全部端')
+  .option('-f, --format <formats>', '目标格式，逗号分隔: docx / html / pdf', 'docx')
+  .option('-o, --output <dir>', '输出目录（默认 {期次}/04-交付/exports）')
+  .action(async (options) => {
+    const { exportCommand } = await import('./commands/export');
+    await exportCommand(options);
   });
 
 program

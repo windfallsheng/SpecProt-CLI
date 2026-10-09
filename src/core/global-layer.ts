@@ -856,7 +856,10 @@ async function collectDeliveryAssets(iterDir: string, deliveryDir: string, platf
   }
 }
 
-export async function freezeIteration(name: string, opts: { force?: boolean } = {}): Promise<string> {
+export async function freezeIteration(
+  name: string,
+  opts: { force?: boolean; platforms?: string[] } = {}
+): Promise<string> {
   const iterDir = getIterationDir(name);
   const readmePath = join(iterDir, 'README.md');
 
@@ -864,12 +867,13 @@ export async function freezeIteration(name: string, opts: { force?: boolean } = 
     throw new Error(`期次不存在: ${name}`);
   }
 
-  // 端列表：按期次 README 平台行解析（端名产品自定，冻结门禁/资产镜像按此扫描）
+  // 端列表：-p 指定按传入筛选，否则按期次 README 平台行解析（端名产品自定，冻结门禁/资产镜像按此扫描）
   const readmeRaw = await readFile(readmePath, 'utf-8');
   const platMatch = readmeRaw.match(/>\s*平台[:：]\s*(.+)/);
-  const platforms = platMatch
+  const declaredPlatforms = platMatch
     ? platformNamesFrom(platMatch[1])
     : [];
+  const platforms = opts.platforms && opts.platforms.length > 0 ? opts.platforms : declaredPlatforms;
 
   // v0.3.1: 冻结门禁 — 风险未裁决 / 待确认未决 不可冻结（--force 跳过）
   if (!opts.force) {
@@ -957,6 +961,14 @@ export async function freezeIteration(name: string, opts: { force?: boolean } = 
     if (!(await pathExists(src))) continue;
 
     const srcContent = await readFile(src, 'utf-8');
+
+    // 按端筛选（-p）：端归属取「来源功能单元」行，无端归属的需求跳过
+    if (opts.platforms && opts.platforms.length > 0) {
+      const pfMatch = srcContent.match(/\| 来源功能单元 \| ([^|]+) \|/);
+      const pfName = pfMatch ? pfMatch[1].trim().split('/')[0] : '';
+      if (!pfName || !opts.platforms.includes(pfName)) continue;
+    }
+
     const header = `<!-- SPECPROT-SNAPSHOT
   来源: GLOBAL/${req.filePath}
   冻结时间: ${frozenAt}
@@ -1002,7 +1014,20 @@ export async function freezeIteration(name: string, opts: { force?: boolean } = 
   // 端名映射桥随交付镜像走（SpecProt 端名 → SpecCore 工程标识）
   const mapSrc = join(iterDir, '_shared', 'PLATFORM_MAP.yaml');
   if (await pathExists(mapSrc)) {
-    await copy(mapSrc, join(deliveryDir, 'PLATFORM_MAP.yaml'));
+    if (opts.platforms && opts.platforms.length > 0) {
+      // 按端筛选：只保留选中端的映射行
+      const mapRaw = await readFile(mapSrc, 'utf-8');
+      const headerLines = mapRaw.split('\n').filter((l) => l.trimStart().startsWith('#'));
+      const kept = mapRaw.split('\n').filter((l) => {
+        const t = l.trim();
+        if (!t || t.startsWith('#')) return false;
+        const key = t.split(':')[0].trim();
+        return opts.platforms!.includes(key);
+      });
+      await writeFile(join(deliveryDir, 'PLATFORM_MAP.yaml'), [...headerLines, ...kept, ''].join('\n'));
+    } else {
+      await copy(mapSrc, join(deliveryDir, 'PLATFORM_MAP.yaml'));
+    }
   }
 
   // 交接说明

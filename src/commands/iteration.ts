@@ -21,6 +21,8 @@ export interface IterationCreateOptions {
 export interface IterationFreezeOptions {
   name?: string;
   force?: boolean;
+  /** 只冻结/导出这些端（逗号分隔），留空 = 全部端 */
+  platforms?: string;
 }
 
 export async function iterationCreateCommand(options: IterationCreateOptions): Promise<void> {
@@ -88,10 +90,19 @@ export async function iterationFreezeCommand(options: IterationFreezeOptions): P
   }
 
   try {
-    const deliveryDir = await freezeIteration(options.name, { force: !!options.force });
+    const onlyPlatforms = options.platforms
+      ? options.platforms.split(',').map((p) => p.trim()).filter(Boolean)
+      : [];
+    const deliveryDir = await freezeIteration(options.name, {
+      force: !!options.force,
+      platforms: onlyPlatforms.length > 0 ? onlyPlatforms : undefined,
+    });
     console.log(`🔒 期次已冻结: ${options.name}`);
     console.log('');
     console.log(`📦 交接快照已生成: ${deliveryDir}/`);
+    if (onlyPlatforms.length > 0) {
+      console.log(`   仅包含端: ${onlyPlatforms.join(', ')}`);
+    }
     console.log('   快照文件头部含 SPECPROT-SNAPSHOT 元数据（来源/冻结时间/冻结版本）');
     console.log('');
     console.log('冻结后的操作：');

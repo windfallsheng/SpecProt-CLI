@@ -204,6 +204,18 @@ specprot init              # 在项目里初始化
 └── PLATFORM_MAP.yaml ← 端名对照表（你起的名字 → 开发的名字）
 ```
 
+### 只交部分端，或导出 Word/PDF
+
+- **只冻结某些端**：`specprot iteration freeze -n 期次名 -p web,booking-service` —— 快照、资产、端名对照表都只留这些端。
+- **导出成 Word / HTML / PDF**（给业务评审、存档、盖章用）：
+
+  ```bash
+  specprot export -i 期次名 -f docx,html     # 全部端，导出 Word + HTML
+  specprot export -i 期次名 -p web -f pdf    # 只导出 web 端，转 PDF
+  ```
+
+  产物在 `04-交付/exports/{格式}/{端}/`；没冻结也能导出（自动从正典库取）。PDF 需要 LibreOffice（`brew install --cask libreoffice`），没装会提示跳过。
+
 ## 常用命令速查
 
 | 动作 | 命令 |
@@ -217,7 +229,8 @@ specprot init              # 在项目里初始化
 | 方案对比 | `specprot schemes -i 期次名 -p 端名 -f 单元名` |
 | 设计系统 | `specprot design -u 页面URL` |
 | 需求管理 | `specprot req new / change / link / status …` |
-| 冻结交付 | `specprot iteration freeze -n 期次名` |
+| 冻结交付 | `specprot iteration freeze -n 期次名`（`-p 端1,端2` 只交部分端） |
+| 导出文档 | `specprot export -i 期次名 -f docx,html`（`-p` 按端筛选） |
 
 ## 常见问题
 

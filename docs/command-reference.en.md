@@ -126,11 +126,12 @@ Lists all iterations and their linked requirements.
 
 ### iteration freeze (alias fz)
 
-Freezes the iteration, forbidding requirement changes. Blocks when risks are unadjudicated or clarifications unresolved.
+Freezes the iteration, forbidding requirement changes. Blocks when risks are unadjudicated or clarifications unresolved. Generates the `04-交付/` handoff snapshot; with `-p`, freezes only the given platforms (snapshots / assets / lookup table filtered accordingly).
 
 | Param | Meaning | Default |
 | :--- | :--- | :--- |
 | `-n, --name` | Iteration name (required) | — |
+| `-p, --platforms` | Freeze only these platforms (comma-separated), empty = all | — |
 | `--force` | Skip the freeze gates | false |
 
 ## 5. Requirement Management (req)
@@ -229,6 +230,19 @@ Extracts/configures a design system, producing DESIGN_SYSTEM.yaml.
 | `-p, --preset` | antd / element / tailwind / material / minimal |
 | `--update [file]` | Regenerate the style guide from DESIGN_SYSTEM.yaml |
 | `-o, --output` | Output file (default DESIGN_SYSTEM.yaml) |
+
+### export (alias exp)
+
+Exports this iteration's requirement docs as Word / HTML / PDF. Sources: the `04-交付/sources/` snapshots first, or the canon for this iteration when not yet frozen; `-p` exports only the given platforms (platform ownership comes from each requirement's "来源功能单元" line). Engine: pandoc; PDF additionally needs LibreOffice.
+
+| Param | Meaning | Default |
+| :--- | :--- | :--- |
+| `-i, --iteration` | Iteration name (required) | — |
+| `-p, --platforms` | Export only these platforms (comma-separated), empty = all | — |
+| `-f, --format` | Target formats, comma-separated: docx / html / pdf | docx |
+| `-o, --output` | Output dir | `{iteration}/04-交付/exports/` |
+
+Output layout: `exports/{format}/{platform}/{requirement}.{ext}`; requirements without a platform go to `未归属端/`.
 
 ### init
 

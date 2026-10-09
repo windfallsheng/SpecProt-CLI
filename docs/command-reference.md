@@ -126,11 +126,12 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 
 ### iteration freeze(别名 fz)
 
-冻结期次,禁止修改需求。风险未裁决 / 待确认未决时拦闸。
+冻结期次,禁止修改需求。风险未裁决 / 待确认未决时拦闸。生成 `04-交付/` 交接快照；`-p` 指定时只冻结部分端（快照 / 资产 / 端名映射桥同步过滤）。
 
 | 参数 | 说明 | 默认 |
 | :--- | :--- | :--- |
 | `-n, --name` | 期次名称(必填) | — |
+| `-p, --platforms` | 只冻结这些端（逗号分隔，端名产品自定），留空 = 全部端 | — |
 | `--force` | 跳过冻结门禁 | false |
 
 ## 5. 需求管理(req)
@@ -229,6 +230,19 @@ specprot check -i 期次-2026-Q3          # 全量汇总
 | `-p, --preset` | antd / element / tailwind / material / minimal |
 | `--update [file]` | 从 DESIGN_SYSTEM.yaml 重新生成样式指南 |
 | `-o, --output` | 输出文件(默认 DESIGN_SYSTEM.yaml) |
+
+### export(别名 exp)
+
+导出本迭代需求文档为 Word / HTML / PDF。数据源优先取 `04-交付/sources/` 快照，未冻结时从正典库取本迭代需求；`-p` 只导出指定端（端归属取自需求的「来源功能单元」）。转换引擎为 pandoc；PDF 另需 LibreOffice。
+
+| 参数 | 说明 | 默认 |
+| :--- | :--- | :--- |
+| `-i, --iteration` | 期次名称（必填） | — |
+| `-p, --platforms` | 只导出这些端（逗号分隔），留空 = 全部端 | — |
+| `-f, --format` | 目标格式，逗号分隔： docx / html / pdf | docx |
+| `-o, --output` | 输出目录 | `{期次}/04-交付/exports/` |
+
+输出结构：`exports/{格式}/{端}/{需求}.{ext}`；无端归属的需求归入 `未归属端/`。
 
 ### init
 
