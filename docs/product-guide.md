@@ -107,7 +107,7 @@ specprot init              # 在项目里初始化
 2. 素材是不是空的？
 3. 需求骨架填满没有？
 4. 待确认的问题解决没有？
-5. 风险裁决完没有？
+5. 风险裁决完没有？（裁决命令：`specprot resolve -i 期次名 -p 端名 -f 单元名` 列出待裁决项，再 `--item 序号 --decision accept|reject` 逐条裁决）
 6. 确认收养这些需求吗？
 
 答完继续跑；答不上来的，说明需求还没想清楚——正好趁机想清楚。
@@ -206,7 +206,7 @@ specprot init              # 在项目里初始化
 
 ### 只交部分端（导出）
 
-- **只冻结某些端**：`specprot iteration freeze -n 期次名 -p web,booking-service` —— 快照、资产、端名对照表都只留这些端。不写 `-p` 就是全部端。
+- **只冻结某些端**：`specprot iteration freeze -n 期次名 -p web,booking-service` —— 快照、资产、端名对照表都只留这些端。不写 `-p` 就是全部端。 冻结时变更回流也同步按端过滤——没选中的端，它的变更保持「变更中」不动，不会凭空多出「已交付」版本。
 
 ### 转成 Word / PDF（独立步骤，先导出后转换）
 
@@ -217,7 +217,7 @@ specprot export -i 期次名 -f docx,html     # 已导出的全部端 → Word +
 specprot export -i 期次名 -p web -f pdf    # 只把 web 端的转成 PDF
 ```
 
-产物在 `04-交付/exports/{格式}/{端}/`。**先 freeze 导出、再 export 转换，两步分开**；还没导出时 export 会提示你先去冻结。PDF 需要 LibreOffice（`brew install --cask libreoffice`），没装会提示跳过。
+产物在期次根的 `exports/{格式}/{端}/`（不混进给开发的 `04-交付/` 交接镜像）。**先 freeze 导出、再 export 转换，两步分开**；还没导出时 export 会提示你先去冻结。PDF 需要 LibreOffice（`brew install --cask libreoffice`），没装会提示跳过。
 
 ## 常用命令速查
 

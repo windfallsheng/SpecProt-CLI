@@ -126,7 +126,7 @@ Lists all iterations and their linked requirements.
 
 ### iteration freeze (alias fz)
 
-Freezes the iteration, forbidding requirement changes. Blocks when risks are unadjudicated or clarifications unresolved. Generates the `04-交付/` handoff snapshot; with `-p`, freezes only the given platforms (snapshots / assets / lookup table filtered accordingly).
+Freezes the iteration, forbidding requirement changes. Blocks when risks are unadjudicated or clarifications unresolved. Generates the `04-交付/` handoff snapshot; with `-p`, freezes only the given platforms (snapshots / assets / lookup table filtered accordingly). With `-p`, the change reflow is filtered per platform as well — unselected platforms keep their "变更中" status untouched.
 
 | Param | Meaning | Default |
 | :--- | :--- | :--- |
@@ -146,6 +146,7 @@ The global requirement layer = the single source of truth for all requirements. 
 | `-d, --desc` | Requirement description | — |
 | `-p, --project` | Owning project | default |
 | `-i, --iteration` | Linked iteration | — |
+| `--platform` | Owning platform (product-defined, e.g. web; used for per-platform export/convert grouping) | — |
 
 ### req adopt
 
@@ -208,7 +209,7 @@ specprot check -i iteration-2026-Q3          # whole-iteration summary
 
 ### prototype (alias pt)
 
-Produces an HTML prototype straight from a requirement doc.
+Produces an HTML prototype straight from a requirement doc. Two entry points: **within an iteration** use `-i <iteration> -p <platform>` (reads the platform-level REQUIREMENT.md; output goes to `{platform}/assets/prototypes/` and ships with the freeze delivery); **ad-hoc single doc** use `-f <path>` (output goes to the default `prototypes/`). Split of work with `design`: this command builds pages, `design` curates style (prototypes auto-apply DESIGN_SYSTEM.yaml).
 
 | Param | Meaning |
 | :--- | :--- |
@@ -218,7 +219,7 @@ Produces an HTML prototype straight from a requirement doc.
 
 ### design (alias ds)
 
-Extracts/configures a design system, producing DESIGN_SYSTEM.yaml.
+Extracts/configures a design system, producing DESIGN_SYSTEM.yaml. Split of work with `prototype`: this command curates **style** (colors/fonts/components), `prototype` builds **pages** (auto-applying this command's output).
 
 | Param | Meaning |
 | :--- | :--- |
@@ -233,17 +234,39 @@ Extracts/configures a design system, producing DESIGN_SYSTEM.yaml.
 
 ### export (alias exp)
 
-Converts the exported requirement docs to Word / HTML / PDF. Sources: the `04-交付/sources/` delivery snapshots (export first via `iteration freeze`, then convert — two separate steps); `-p` converts only the given platforms (platform ownership comes from each requirement's "来源功能单元" line). Engine: pandoc; PDF additionally needs LibreOffice.
+Converts the exported requirement docs to Word / HTML / PDF. Sources: the `04-交付/sources/` delivery snapshots (export first via `iteration freeze`, then convert — two separate steps); `-p` converts only the given platforms (platform ownership comes first from "来源功能单元", then from the "所属端" line). Engine: pandoc; PDF additionally needs LibreOffice.
 
 | Param | Meaning | Default |
 | :--- | :--- | :--- |
 | `-i, --iteration` | Iteration name (required) | — |
 | `-p, --platforms` | Convert only these platforms (comma-separated), empty = all exported | — |
 | `-f, --format` | Target formats, comma-separated: docx / html / pdf | docx |
-| `-o, --output` | Output dir | `{iteration}/04-交付/exports/` |
+| `-o, --output` | Output dir | `{iteration}/exports/` |
 
 Output layout: `exports/{format}/{platform}/{requirement}.{ext}`; requirements without a platform go to `未归属端/`.
+
+### resolve
+
+Adjudicates a unit's RISK.md "待裁决" and CLARIFY.md "未决" items, clearing the freeze gate. Without `--item` it only lists; after each adjudication the numbering is re-sorted and re-printed, so keep adjudicating by the fresh numbers.
+
+| Param | Meaning |
+| :--- | :--- |
+| `-i, --iteration` | Iteration name (required) |
+| `-p, --platform` | Platform name (required) |
+| `-f, --feature` | Feature unit name (required) |
+| `--item <n>` | Item number (default: list only) |
+| `--decision <d>` | accept / reject |
+| `--note <text>` | Adjudication reason (written into the verdict column) |
 
 ### init
 
 Initializes the project: global requirement layer + Slash Commands injection.
+
+## Parameter Semantics Quick Reference (same flag, different meaning per command)
+
+| Flag | Meaning by command |
+| :--- | :--- |
+| `-p` | `req new` = owning project; `convert / analyze / slice / deepen / assets / schemes / check / prototype` = a single platform name; `run / freeze / export / iteration create` = platform list; `design` = preset style |
+| `-f` | `deepen / assets / schemes` = feature unit; `prototype / check / design` = file path; `iteration create` = start date; `export` = target format |
+
+> Memory hook: **-p usually means "platform"** (req new's project and design's preset are historical exceptions); **-f is the unit name in unit-centric commands** — read the prompt otherwise.

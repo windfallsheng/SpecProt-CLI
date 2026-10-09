@@ -126,7 +126,7 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 
 ### iteration freeze(别名 fz)
 
-冻结期次,禁止修改需求。风险未裁决 / 待确认未决时拦闸。生成 `04-交付/` 交接快照；`-p` 指定时只冻结部分端（快照 / 资产 / 端名映射桥同步过滤）。
+冻结期次,禁止修改需求。风险未裁决 / 待确认未决时拦闸。生成 `04-交付/` 交接快照；`-p` 指定时只冻结部分端（快照 / 资产 / 端名映射桥 / 变更回流同步按端过滤，未选中端的变更保持「变更中」不动）。
 
 | 参数 | 说明 | 默认 |
 | :--- | :--- | :--- |
@@ -146,6 +146,7 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 | `-d, --desc` | 需求描述 | — |
 | `-p, --project` | 所属项目 | default |
 | `-i, --iteration` | 关联期次 | — |
+| `--platform` | 所属端名(产品自定,如 web;按端导出与转换时归组用) | — |
 
 ### req adopt
 
@@ -208,7 +209,7 @@ specprot check -i 期次-2026-Q3          # 全量汇总
 
 ### prototype(别名 pt)
 
-从需求文档直出 HTML 原型。
+从需求文档直出 HTML 原型。两条入口分工：**期次内**用 `-i 期次 -p 端`（读端级 REQUIREMENT.md，产物进 `{端}/assets/prototypes/` 随冻结交付走）；**随手单文档**用 `-f 文档路径`（产物进默认 `prototypes/`）。与 `design` 分工：本命令生成页面，`design` 沉淀风格（原型自动套用 DESIGN_SYSTEM.yaml）。
 
 | 参数 | 说明 |
 | :--- | :--- |
@@ -218,7 +219,7 @@ specprot check -i 期次-2026-Q3          # 全量汇总
 
 ### design(别名 ds)
 
-提取/配置设计系统,产出 DESIGN_SYSTEM.yaml。
+提取/配置设计系统,产出 DESIGN_SYSTEM.yaml。与 `prototype` 分工：本命令沉淀**风格**（色彩/字体/组件），`prototype` 生成**页面**（自动套用本命令的产物）。
 
 | 参数 | 说明 |
 | :--- | :--- |
@@ -233,17 +234,39 @@ specprot check -i 期次-2026-Q3          # 全量汇总
 
 ### export(别名 exp)
 
-把已导出的需求文档转换为 Word / HTML / PDF。数据源为 `04-交付/sources/` 交付快照（先 `iteration freeze` 导出，再转格式，两个独立步骤）；`-p` 只转换指定端（端归属取自需求的「来源功能单元」）。转换引擎为 pandoc；PDF 另需 LibreOffice。
+把已导出的需求文档转换为 Word / HTML / PDF。数据源为 `04-交付/sources/` 交 付快照（先 `iteration freeze` 导出，再转格式，两个独立步骤）；`-p` 只转换指定端 （端归属优先取「来源功能单元」，其次「所属端」）。转换引擎为 pandoc；PDF 另需 LibreOffice。
 
 | 参数 | 说明 | 默认 |
 | :--- | :--- | :--- |
 | `-i, --iteration` | 期次名称（必填） | — |
 | `-p, --platforms` | 只转换这些端（逗号分隔），留空 = 已导出的全部端 | — |
 | `-f, --format` | 目标格式，逗号分隔： docx / html / pdf | docx |
-| `-o, --output` | 输出目录 | `{期次}/04-交付/exports/` |
+| `-o, --output` | 输出目录 | `{期次}/exports/` |
 
 输出结构：`exports/{格式}/{端}/{需求}.{ext}`；无端归属的需求归入 `未归属端/`。
+
+### resolve
+
+裁决单元内 RISK.md 的「待裁决」与 CLARIFY.md 的「未决」，清零冻结门禁。不带 `--item` 只列清单；裁决后编号自动重排并即时打印，按新编号连续裁决即可。
+
+| 参数 | 说明 |
+| :--- | :--- |
+| `-i, --iteration` | 期次名称(必填) |
+| `-p, --platform` | 端名(必填) |
+| `-f, --feature` | 功能单元名(必填) |
+| `--item <n>` | 待裁决项序号(缺省 = 仅列出清单) |
+| `--decision <d>` | 裁决: accept / reject |
+| `--note <text>` | 裁决理由(写入裁决列) |
 
 ### init
 
 初始化项目:全局需求层 + Slash Commands 注入。
+
+## 参数语义速查（同名参数在不同命令下含义不同）
+
+| 参数 | 各命令下的含义 |
+| :--- | :--- |
+| `-p` | `req new` = 所属项目；`convert / analyze / slice / deepen / assets / schemes / check / prototype` = 单个端名；`run / freeze / export / iteration create` = 端列表；`design` = 预设风格 |
+| `-f` | `deepen / assets / schemes` = 功能单元；`prototype / check / design` = 文件路径；`iteration create` = 开始日期；`export` = 目标格式 |
+
+> 按产品自用习惯记忆即可：**-p 多半是「端」**（req new 的 project 与 design 的 preset 是历史例外），**-f 在「围绕单元干活」的命令里是单元名，其余按提示阅读**。

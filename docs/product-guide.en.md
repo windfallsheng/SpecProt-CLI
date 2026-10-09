@@ -107,7 +107,7 @@ iteration-Q3/00-素材/
 2. Are the materials empty?
 3. Is the requirement skeleton filled?
 4. Are clarifications resolved?
-5. Are risks adjudicated?
+5. Are risks adjudicated? (Adjudicate with `specprot resolve -i <iteration> -p <platform> -f <unit>` to list pending items, then `--item <n> --decision accept|reject` one by one.)
 6. Confirm adopting these requirements?
 
 Answer and it continues; if you can't answer, the requirement isn't thought through yet — a good moment to think it through.
@@ -206,7 +206,7 @@ What's inside 04-交付/?
 
 ### Ship part of the platforms (export)
 
-- **Freeze only some platforms**: `specprot iteration freeze -n name -p web,booking-service` — snapshots, assets and the lookup table keep only these platforms. Omit `-p` to ship them all.
+- **Freeze only some platforms**: `specprot iteration freeze -n name -p web,booking-service` — snapshots, assets and the lookup table keep only these platforms. Omit `-p` to ship them all. The change reflow is filtered per platform too — unselected platforms keep their "变更中" status untouched.
 
 ### Convert to Word / PDF (a separate step: export first, then convert)
 
@@ -217,7 +217,7 @@ specprot export -i name -f docx,html    # all exported platforms → Word + HTML
 specprot export -i name -p web -f pdf   # only the web platform → PDF
 ```
 
-Output lands in `04-交付/exports/{format}/{platform}/`. **Export first (freeze), then convert (export) — two separate steps**; if nothing is exported yet, export tells you to freeze first. PDF needs LibreOffice (`brew install --cask libreoffice`); if missing, it skips with a hint.```
+Output lands in `exports/{format}/{platform}/` at the iteration root (kept out of the `04-交付/` handoff mirror meant for dev). **Export first (freeze), then convert (export) — two separate steps**; if nothing is exported yet, export tells you to freeze first. PDF needs LibreOffice (`brew install --cask libreoffice`); if missing, it skips with a hint.```
 
 ## Command Cheat Sheet
 
