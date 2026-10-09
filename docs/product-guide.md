@@ -204,17 +204,20 @@ specprot init              # 在项目里初始化
 └── PLATFORM_MAP.yaml ← 端名对照表（你起的名字 → 开发的名字）
 ```
 
-### 只交部分端，或导出 Word/PDF
+### 只交部分端（导出）
 
-- **只冻结某些端**：`specprot iteration freeze -n 期次名 -p web,booking-service` —— 快照、资产、端名对照表都只留这些端。
-- **导出成 Word / HTML / PDF**（给业务评审、存档、盖章用）：
+- **只冻结某些端**：`specprot iteration freeze -n 期次名 -p web,booking-service` —— 快照、资产、端名对照表都只留这些端。不写 `-p` 就是全部端。
 
-  ```bash
-  specprot export -i 期次名 -f docx,html     # 全部端，导出 Word + HTML
-  specprot export -i 期次名 -p web -f pdf    # 只导出 web 端，转 PDF
-  ```
+### 转成 Word / PDF（独立步骤，先导出后转换）
 
-  产物在 `04-交付/exports/{格式}/{端}/`；没冻结也能导出（自动从正典库取）。PDF 需要 LibreOffice（`brew install --cask libreoffice`），没装会提示跳过。
+把上面导出的定稿快照转成别的格式，给业务评审、存档、盖章用：
+
+```bash
+specprot export -i 期次名 -f docx,html     # 已导出的全部端 → Word + HTML
+specprot export -i 期次名 -p web -f pdf    # 只把 web 端的转成 PDF
+```
+
+产物在 `04-交付/exports/{格式}/{端}/`。**先 freeze 导出、再 export 转换，两步分开**；还没导出时 export 会提示你先去冻结。PDF 需要 LibreOffice（`brew install --cask libreoffice`），没装会提示跳过。
 
 ## 常用命令速查
 
@@ -230,7 +233,7 @@ specprot init              # 在项目里初始化
 | 设计系统 | `specprot design -u 页面URL` |
 | 需求管理 | `specprot req new / change / link / status …` |
 | 冻结交付 | `specprot iteration freeze -n 期次名`（`-p 端1,端2` 只交部分端） |
-| 导出文档 | `specprot export -i 期次名 -f docx,html`（`-p` 按端筛选） |
+| 转换格式 | `specprot export -i 期次名 -f docx,html`（`-p` 按端筛选） |
 
 ## 常见问题
 

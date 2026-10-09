@@ -1,9 +1,8 @@
 /**
  * 导出命令 — 本迭代需求文档 → Word(.docx) / HTML / PDF
  *
- * 数据源（按优先级）:
- *   1. {期次}/04-交付/sources/*.md — 已冻结快照
- *   2. GLOBAL/PROJECTS 中关联本迭代的需求 — 未冻结也能导出
+ * 数据源: {期次}/04-交付/sources/*.md — freeze 导出的定稿快照
+ * （导出与转换是两个独立步骤: 先 freeze 导出，再 export 转格式）
  *
  * 转换引擎: pandoc（与 SpecCore spec2doc 同源）
  *   - docx / html: pandoc 直接转
@@ -16,9 +15,9 @@
 
 import { execSync } from 'child_process';
 import { tmpdir } from 'os';
-import { basename, join } from 'path';
+import { join } from 'path';
 import { ensureDir, pathExists, readFile, readdir, remove, writeFile } from 'fs-extra';
-import { getGlobalDir, getIterationDir, readGlobalIndex } from '../core/global-layer';
+import { getIterationDir } from '../core/global-layer';
 
 /** 支持的目标格式 → pandoc writer */
 const WRITER_MAP: Record<string, string> = {
@@ -70,7 +69,7 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
     ? options.platforms.split(',').map((p) => p.trim()).filter(Boolean)
     : [];
 
-  // ── 收集源需求（快照优先，正典兜底） ──
+  // ── 收集源需求（只读已导出的交付快照；导出是 freeze 的活，转换是这里的活） ──
   const iterDir = getIterationDir(iteration);
   const sourcesDir = join(iterDir, '04-交付', 'sources');
   const sources: { file: string; content: string }[] = [];
@@ -82,15 +81,7 @@ export async function exportCommand(options: ExportOptions): Promise<void> {
     }
   }
   if (sources.length === 0) {
-    const index = await readGlobalIndex();
-    for (const r of index.reqs.filter((e) => e.iteration === iteration)) {
-      const src = join(getGlobalDir(), r.filePath);
-      if (!(await pathExists(src))) continue;
-      sources.push({ file: basename(src), content: await readFile(src, 'utf-8') });
-    }
-  }
-  if (sources.length === 0) {
-    console.error(`❌ 期次「${iteration}」没有可导出的需求（先跑流水线或 freeze）`);
+    console.error(`❌ 期次「${iteration}」还没有导出的需求。请先导出: specprot iteration freeze -n ${iteration}`);
     return;
   }
 

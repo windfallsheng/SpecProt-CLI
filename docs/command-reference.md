@@ -233,12 +233,12 @@ specprot check -i 期次-2026-Q3          # 全量汇总
 
 ### export(别名 exp)
 
-导出本迭代需求文档为 Word / HTML / PDF。数据源优先取 `04-交付/sources/` 快照，未冻结时从正典库取本迭代需求；`-p` 只导出指定端（端归属取自需求的「来源功能单元」）。转换引擎为 pandoc；PDF 另需 LibreOffice。
+把已导出的需求文档转换为 Word / HTML / PDF。数据源为 `04-交付/sources/` 交付快照（先 `iteration freeze` 导出，再转格式，两个独立步骤）；`-p` 只转换指定端（端归属取自需求的「来源功能单元」）。转换引擎为 pandoc；PDF 另需 LibreOffice。
 
 | 参数 | 说明 | 默认 |
 | :--- | :--- | :--- |
 | `-i, --iteration` | 期次名称（必填） | — |
-| `-p, --platforms` | 只导出这些端（逗号分隔），留空 = 全部端 | — |
+| `-p, --platforms` | 只转换这些端（逗号分隔），留空 = 已导出的全部端 | — |
 | `-f, --format` | 目标格式，逗号分隔： docx / html / pdf | docx |
 | `-o, --output` | 输出目录 | `{期次}/04-交付/exports/` |
 

@@ -233,12 +233,12 @@ Extracts/configures a design system, producing DESIGN_SYSTEM.yaml.
 
 ### export (alias exp)
 
-Exports this iteration's requirement docs as Word / HTML / PDF. Sources: the `04-交付/sources/` snapshots first, or the canon for this iteration when not yet frozen; `-p` exports only the given platforms (platform ownership comes from each requirement's "来源功能单元" line). Engine: pandoc; PDF additionally needs LibreOffice.
+Converts the exported requirement docs to Word / HTML / PDF. Sources: the `04-交付/sources/` delivery snapshots (export first via `iteration freeze`, then convert — two separate steps); `-p` converts only the given platforms (platform ownership comes from each requirement's "来源功能单元" line). Engine: pandoc; PDF additionally needs LibreOffice.
 
 | Param | Meaning | Default |
 | :--- | :--- | :--- |
 | `-i, --iteration` | Iteration name (required) | — |
-| `-p, --platforms` | Export only these platforms (comma-separated), empty = all | — |
+| `-p, --platforms` | Convert only these platforms (comma-separated), empty = all exported | — |
 | `-f, --format` | Target formats, comma-separated: docx / html / pdf | docx |
 | `-o, --output` | Output dir | `{iteration}/04-交付/exports/` |
 

@@ -204,17 +204,20 @@ What's inside 04-交付/?
 └── PLATFORM_MAP.yaml ← name lookup (your names → dev names)
 ```
 
-### Ship part of the platforms, or export Word/PDF
+### Ship part of the platforms (export)
 
-- **Freeze only some platforms**: `specprot iteration freeze -n name -p web,booking-service` — snapshots, assets and the lookup table keep only these platforms.
-- **Export as Word / HTML / PDF** (for business review, archiving, sealing):
+- **Freeze only some platforms**: `specprot iteration freeze -n name -p web,booking-service` — snapshots, assets and the lookup table keep only these platforms. Omit `-p` to ship them all.
 
-  ```bash
-  specprot export -i name -f docx,html    # all platforms, Word + HTML
-  specprot export -i name -p web -f pdf   # only the web platform, as PDF
-  ```
+### Convert to Word / PDF (a separate step: export first, then convert)
 
-  Output lands in `04-交付/exports/{format}/{platform}/`; works even before freeze (pulls from the canon). PDF needs LibreOffice (`brew install --cask libreoffice`); if missing, it skips with a hint.```
+Turn the exported snapshots into other formats for business review, archiving, sealing:
+
+```bash
+specprot export -i name -f docx,html    # all exported platforms → Word + HTML
+specprot export -i name -p web -f pdf   # only the web platform → PDF
+```
+
+Output lands in `04-交付/exports/{format}/{platform}/`. **Export first (freeze), then convert (export) — two separate steps**; if nothing is exported yet, export tells you to freeze first. PDF needs LibreOffice (`brew install --cask libreoffice`); if missing, it skips with a hint.```
 
 ## Command Cheat Sheet
 
@@ -230,7 +233,7 @@ What's inside 04-交付/?
 | Design system | `specprot design -u pageURL` |
 | Requirement mgmt | `specprot req new / change / link / status …` |
 | Freeze & deliver | `specprot iteration freeze -n name` (`-p p1,p2` = selected platforms only) |
-| Export docs | `specprot export -i name -f docx,html` (`-p` by platform) |
+| Convert formats | `specprot export -i name -f docx,html` (`-p` by platform) |
 
 ## FAQ
 
