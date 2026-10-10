@@ -11,3 +11,5 @@ Thumbs.db
 .env.local
 *.tsbuildinfo
 coverage/
+
+.speccore/

@@ -46,12 +46,22 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 
 ### convert(别名 cv)
 
-素材转换:docx/pdf/xlsx → md,录音提示转写,图片建索引。
+素材转换:docx/pdf/xlsx → md(一字不差),图片建索引;音频/视频按 `.specprot.yml` 策略处理。
 
 | 参数 | 说明 |
 | :--- | :--- |
 | `-i, --iteration` | 期次名称(必填) |
 | `-p, --platform` | 只转换指定端;留空 = 全部端 + shared |
+
+**素材处理策略**(期次根目录 `.specprot.yml`,可选,删除即默认):
+
+| 配置项 | 取值 | 说明 |
+| :--- | :--- | :--- |
+| `materials.audio.mode` | `prompt`(默认) / `ai` / `local` / `third-party` | 音频转写模式:提示自行转写 / 宿主 AI 直读 / 本地 whisper / 三方 API |
+| `materials.video.mode` | 同上 | 视频处理模式(视频 = 音轨转写 + 关键帧进图片索引) |
+| `materials.refine.enabled` | `true`(默认) / `false` | 提炼稿机制开关 |
+
+**提炼稿机制**:宿主 AI 将杂乱素材提炼为干货,落盘 `00-素材/converted/{端}/_refined/`(四板斧:去噪 → 分段 → 结论先行 → 溯源)。analyze 优先以提炼稿为依据,原味转换产物保留作回溯。音视频以 `ai` 模式处理时,convert 生成 `converted/_pending-ai.md` 接力清单,宿主 AI 转写提炼后删除清单。
 
 ### analyze(别名 az)
 

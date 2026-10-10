@@ -45,6 +45,11 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
   const context = await collectMaterials(options.iteration, platform);
   const platformSources = context.sources.filter((s) => s.platform === platform);
   const sharedSources = context.sources.filter((s) => s.platform === 'shared');
+  // 提炼稿优先（_refined/ 是 AI 提炼的干货），原文回溯
+  const platformRefined = platformSources.filter((s) => s.type === 'refined');
+  const platformRaw = platformSources.filter((s) => s.type !== 'refined');
+  const sharedRefined = sharedSources.filter((s) => s.type === 'refined');
+  const sharedRaw = sharedSources.filter((s) => s.type !== 'refined');
 
   if (context.sources.length === 0) {
     console.error(`❌ 素材区没有可读素材。`);
@@ -53,7 +58,7 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     return;
   }
 
-  console.log(`   素材: ${platformSources.length} 份端素材(含本端转换产物) + ${sharedSources.length} 份跨端通用`);
+  console.log(`   素材: ${platformSources.length} 份端素材(提炼稿 ${platformRefined.length} + 原文 ${platformRaw.length}) + ${sharedSources.length} 份跨端通用`);
 
   // 2. 目标文件
   const reqPath = join(getPlatformDir(options.iteration, platform), 'REQUIREMENT.md');
@@ -75,8 +80,10 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
     clarifyPath,
     reqTemplate,
     clarifyTemplate,
-    platformSources,
-    sharedSources,
+    platformRefined,
+    platformRaw,
+    sharedRefined,
+    sharedRaw,
     reference,
   });
 
@@ -101,8 +108,10 @@ function buildPlatformPrompt(ctx: {
   clarifyPath: string;
   reqTemplate: { path: string; content: string } | null;
   clarifyTemplate: { path: string; content: string } | null;
-  platformSources: { file: string; content: string }[];
-  sharedSources: { file: string; content: string }[];
+  platformRefined: { file: string; content: string }[];
+  platformRaw: { file: string; content: string }[];
+  sharedRefined: { file: string; content: string }[];
+  sharedRaw: { file: string; content: string }[];
   reference: ReferenceContext;
 }): string {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
@@ -123,7 +132,8 @@ function buildPlatformPrompt(ctx: {
   p += `4. **素材中没有的信息不编造**——空缺处保持「待确认」，记入待确认清单\n`;
   p += `5. 验收标准必须可测试，格式: \`AC-NN: [前置条件] → [操作] → [预期结果]\`\n`;
   p += `6. 页面/接口清单要完整：每个页面列出字段、操作按钮、业务规则\n`;
-  p += `7. **参考上下文**（下方「参考上下文」节）：与同端历史需求保持术语与风格一致，同名概念不得另造术语；与既有需求重复/冲突处必须记入待确认清单\n\n`;
+  p += `7. **参考上下文**（下方「参考上下文」节）：与同端历史需求保持术语与风格一致，同名概念不得另造术语；与既有需求重复/冲突处必须记入待确认清单\n`;
+  p += `8. **提炼稿优先**：存在「提炼稿」节时以提炼稿为主要依据，原文仅作回溯核对；两者冲突以提炼稿为准，但疑点记入待确认清单\n\n`;
 
   // 参考上下文（既有沉淀:历史需求 / 术语表 / 共享规则 / 设计系统 / 端名映射桥）
   p += formatReferenceSection(ctx.reference, ctx.label);
@@ -142,18 +152,30 @@ function buildPlatformPrompt(ctx: {
     p += `\`\`\`markdown\n${ctx.reqTemplate.content}\n\`\`\`\n\n`;
   }
 
-  if (ctx.platformSources.length > 0) {
-    p += `## 端素材（${ctx.label}）\n\n`;
-    for (const s of ctx.platformSources) {
+  if (ctx.platformRefined.length > 0) {
+    p += `## 端素材 · 提炼稿（${ctx.label}，优先依据）\n\n`;
+    for (const s of ctx.platformRefined) {
       p += `### ${s.file}\n\n\`\`\`\n${s.content}\n\`\`\`\n\n`;
     }
-  } else {
+  }
+  if (ctx.platformRaw.length > 0) {
+    p += `## 端素材 · 原文（${ctx.label}，回溯依据）\n\n`;
+    for (const s of ctx.platformRaw) {
+      p += `### ${s.file}\n\n\`\`\`\n${s.content}\n\`\`\`\n\n`;
+    }
+  } else if (ctx.platformRefined.length === 0) {
     p += `## 端素材（${ctx.label}）\n\n（该端素材目录为空，仅基于跨端通用素材分析）\n\n`;
   }
 
-  if (ctx.sharedSources.length > 0) {
-    p += `## 跨端通用素材（shared/ + converted/shared/）\n\n`;
-    for (const s of ctx.sharedSources) {
+  if (ctx.sharedRefined.length > 0) {
+    p += `## 跨端通用素材 · 提炼稿（优先依据）\n\n`;
+    for (const s of ctx.sharedRefined) {
+      p += `### ${s.file}\n\n\`\`\`\n${s.content}\n\`\`\`\n\n`;
+    }
+  }
+  if (ctx.sharedRaw.length > 0) {
+    p += `## 跨端通用素材 · 原文（shared/ + converted/shared/，回溯依据）\n\n`;
+    for (const s of ctx.sharedRaw) {
       p += `### ${s.file}\n\n\`\`\`\n${s.content}\n\`\`\`\n\n`;
     }
   }

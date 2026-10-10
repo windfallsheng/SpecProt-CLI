@@ -3,7 +3,8 @@
  *
  * 分界原则：格式转换是确定性的（CLI 干），内容提炼是语义性的（AI 干）。
  *   docx/pdf/xlsx → markdown 文本：确定性转换，产物进 converted/{端}/（与素材端目录对应）
- *   录音文件 → 提示转写（CLI 不做 ASR），转写文本由用户放入素材区
+ *   音频/视频 → 按 .specprot.yml 策略处理（prompt 提示转写 / ai 宿主直读 / local 本地 whisper / third-party 三方 API），
+ *              ai 模式生成 converted/_pending-ai.md 清单，宿主 AI 接力：转写 → 提炼 → 落盘 converted/{端}/_refined/
  *   图片 → 不转文本，建立素材索引（AI 生成原型时按需查看原图）
  *
  * 原始素材只读，转换产物进 converted/——对应 SpecCore sources/ 只读纪律。
@@ -12,6 +13,7 @@
 import { readFile, writeFile, pathExists, readdir, ensureDir, stat } from 'fs-extra';
 import { join, extname, basename } from 'path';
 import mammoth from 'mammoth';
+import * as yaml from 'js-yaml';
 // @ts-ignore — pdf-parse 无类型定义
 import pdfParse from 'pdf-parse';
 import * as XLSX from 'xlsx';
@@ -35,8 +37,48 @@ export interface ConvertResult {
 export interface ConvertSummary {
   total: number;
   converted: ConvertResult[];
-  skipped: string[];   // 无法转换的文件（录音/图片/未知格式）
+  skipped: string[];   // 无法转换的文件（prompt 模式的音视频/未知格式）
   images: string[];    // 图片清单（建立索引）
+  pendingAI: string[]; // 待宿主 AI 处理的音视频文件（ai/local/third-party 模式）
+}
+
+// ============================================================
+// 素材处理策略配置（{期次}/.specprot.yml）
+// ============================================================
+
+export type MediaMode = 'prompt' | 'ai' | 'local' | 'third-party';
+
+export interface MaterialConfig {
+  audio: { mode: MediaMode };
+  video: { mode: MediaMode };
+  refine: { enabled: boolean };
+}
+
+const DEFAULT_CONFIG: MaterialConfig = {
+  audio: { mode: 'prompt' },
+  video: { mode: 'prompt' },
+  refine: { enabled: true },
+};
+
+const VALID_MODES = ['prompt', 'ai', 'local', 'third-party'];
+
+/** 读取期次级素材处理策略（缺失/解析失败 → 全默认，向后兼容） */
+export async function readMaterialConfig(iterationName: string): Promise<MaterialConfig> {
+  const cfgPath = join(process.cwd(), iterationName, '.specprot.yml');
+  if (!(await pathExists(cfgPath))) return DEFAULT_CONFIG;
+  try {
+    const parsed = yaml.load(await readFile(cfgPath, 'utf-8')) as { materials?: any };
+    const m = parsed?.materials ?? {};
+    const modeOf = (raw: any, fallback: MediaMode): MediaMode =>
+      typeof raw?.mode === 'string' && VALID_MODES.includes(raw.mode) ? raw.mode : fallback;
+    return {
+      audio: { mode: modeOf(m.audio, DEFAULT_CONFIG.audio.mode) },
+      video: { mode: modeOf(m.video, DEFAULT_CONFIG.video.mode) },
+      refine: { enabled: m.refine?.enabled !== false },
+    };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
 }
 
 // ============================================================
@@ -102,6 +144,7 @@ async function convertFile(filePath: string): Promise<string> {
 const CONVERTIBLE = /\.(docx|pdf|xlsx|xls)$/i;
 const IMAGE = /\.(png|jpg|jpeg|gif|bmp|webp)$/i;
 const AUDIO = /\.(mp3|m4a|wav|wma|aac|flac|amr)$/i;
+const VIDEO = /\.(mp4|mov|mkv|avi|webm|m4v)$/i;
 
 /**
  * 扫描素材区（端子目录 + shared/），转换 docx/pdf/xlsx 进 converted/，建立图片索引
@@ -110,7 +153,8 @@ export async function scanAndConvert(
   iterationName: string,
   targetPlatform?: Platform | 'shared'
 ): Promise<ConvertSummary> {
-  const summary: ConvertSummary = { total: 0, converted: [], skipped: [], images: [] };
+  const summary: ConvertSummary = { total: 0, converted: [], skipped: [], images: [], pendingAI: [] };
+  const cfg = await readMaterialConfig(iterationName);
 
   const scanDirs: Array<{ dir: string }> = [];
   if (targetPlatform && targetPlatform !== 'shared') {
@@ -154,7 +198,17 @@ export async function scanAndConvert(
       } else if (IMAGE.test(file)) {
         summary.images.push(`${dir}/${file}`);
       } else if (AUDIO.test(file)) {
-        summary.skipped.push(`${dir}/${file}（录音——请用转写工具转为文本后放入素材区）`);
+        if (cfg.audio.mode === 'prompt') {
+          summary.skipped.push(`${dir}/${file}（录音——请用转写工具转为文本后放入素材区）`);
+        } else {
+          summary.pendingAI.push(`${dir}/${file}|audio|${cfg.audio.mode}`);
+        }
+      } else if (VIDEO.test(file)) {
+        if (cfg.video.mode === 'prompt') {
+          summary.skipped.push(`${dir}/${file}（视频——请转写音轨为文本、抽取关键帧后放入素材区）`);
+        } else {
+          summary.pendingAI.push(`${dir}/${file}|video|${cfg.video.mode}`);
+        }
       } else {
         // txt/md 无需转换，collectMaterials 直接读取
         summary.skipped.push(`${dir}/${file}（无需转换）`);
@@ -162,7 +216,45 @@ export async function scanAndConvert(
     }
   }
 
+  if (summary.pendingAI.length > 0) {
+    await writePendingAIList(iterationName, summary.pendingAI);
+  }
   return summary;
+}
+
+/** 生成待 AI 处理清单（converted/_pending-ai.md）——宿主 AI 接力处理的入口 */
+async function writePendingAIList(iterationName: string, pending: string[]): Promise<void> {
+  const rows = pending.map((entry, i) => {
+    const [file, kind, mode] = entry.split('|');
+    const modeLabel: Record<string, string> = {
+      ai: '宿主 AI 直读（多模态）',
+      local: '本地 whisper 转写',
+      'third-party': '三方转写 API',
+    };
+    return `| ${i + 1} | \`00-素材/${file}\` | ${kind === 'audio' ? '音频' : '视频'} | ${modeLabel[mode] || mode} |`;
+  });
+  const content = [
+    '# 待 AI 处理的音视频素材',
+    '',
+    '> 本清单由 convert 生成。以下文件需按处理协议接力处理，产物落盘后请删除本清单。',
+    '',
+    '## 文件清单',
+    '',
+    '| # | 文件 | 类型 | 处理模式 |',
+    '| :--- | :--- | :--- | :--- |',
+    ...rows,
+    '',
+    '## 处理协议',
+    '',
+    '1. **音频**: 转写全文（宿主 AI 直读，或按配置用本地 whisper / 三方 API 转写后投回文本）。',
+    '2. **视频**: 拆两路——音轨走转写链；画面每 30 秒抽一关键帧存 `00-素材/{端}/frames/`（图片索引自动收录）。',
+    '3. **提炼**（四板斧）: 去噪（寒暄/重复/口头禅）→ 分段（主题归并）→ 结论先行（决策/待办/争论点）→ 溯源（标注原文位置）。',
+    '4. **落盘**: 提炼稿写入 `00-素材/converted/{端}/_refined/{原名}.md`，文件头标注 `> 提炼自: 00-素材/{端}/{原名}`，文末附 `## 待确认`（不确定项）。',
+    '5. 原始音频/视频文件保持只读，一字不改；提炼稿是衍生品，可随澄清迭代更新。',
+    '',
+  ].join('\n') + '\n';
+  const idxPath = join(getConvertedDir(iterationName), '_pending-ai.md');
+  await writeFile(idxPath, content, 'utf-8');
 }
 
 /** 建立图片索引（供 AI 生成原型时按需查看） */

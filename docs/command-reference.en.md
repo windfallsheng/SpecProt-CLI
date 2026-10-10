@@ -46,12 +46,22 @@ specprot run -i iteration-2026-Q3 --from analyze --to slice
 
 ### convert (alias cv)
 
-Material conversion: docx/pdf/xlsx → md, audio transcription hint, image indexing.
+Material conversion: docx/pdf/xlsx → md (verbatim), image indexing; audio/video handled per `.specprot.yml` strategy.
 
 | Param | Meaning |
 | :--- | :--- |
 | `-i, --iteration` | Iteration name (required) |
 | `-p, --platform` | Convert only this platform; empty = all platforms + shared |
+
+**Material strategy** (`.specprot.yml` at iteration root, optional; delete = defaults):
+
+| Key | Values | Description |
+| :--- | :--- | :--- |
+| `materials.audio.mode` | `prompt` (default) / `ai` / `local` / `third-party` | Audio transcription mode: manual hint / host-AI direct read / local whisper / third-party API |
+| `materials.video.mode` | same as above | Video mode (audio-track transcription + keyframes into image index) |
+| `materials.refine.enabled` | `true` (default) / `false` | Refined-draft mechanism toggle |
+
+**Refined-draft mechanism**: the host AI distills noisy materials into refined drafts at `00-素材/converted/{platform}/_refined/` (denoise → segment → conclusion-first → traceability). `analyze` prioritizes refined drafts; verbatim conversions remain as trace-back sources. With `ai` mode, `convert` generates `converted/_pending-ai.md` handoff list; delete it after transcription + refinement.
 
 ### analyze (alias az)
 

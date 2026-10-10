@@ -394,6 +394,30 @@ export async function createIteration(info: IterationInfo): Promise<string> {
 
   // 产品模板区（模板优先，系统默认兜底；_templates 不参与素材扫描）
   await ensureDir(join(iterDir, '00-素材', '_templates'));
+
+  // 期次级素材处理策略配置（可选，删除即全默认；convert 读取）
+  const cfgPath = join(iterDir, '.specprot.yml');
+  if (!(await pathExists(cfgPath))) {
+    await writeFile(cfgPath, `# SpecProt 期次级配置（可选；删除本文件 = 全用默认值）
+#
+# 素材处理策略 — 音频/视频转写模式：
+#   prompt       提示用户自行转写后投料（默认，零依赖）
+#   ai           宿主 AI 直读文件（需宿主多模态能力，读一次落盘复用）
+#   local        本地 whisper 转写（离线、隐私最优，需自装 whisper）
+#   third-party  三方转写 API（质量高，需 key 且音频外发，请自行权衡）
+#
+# 提炼稿机制 — AI 提炼干货落盘 converted/{端}/_refined/，作为 analyze 的优先依据：
+#   refine.enabled: true  启用（默认）；false 关闭（analyze 直接读原味转换产物）
+materials:
+  audio:
+    mode: prompt
+  video:
+    mode: prompt
+  refine:
+    enabled: true
+`, 'utf-8');
+  }
+
   await writeFile(
     join(iterDir, '00-素材', '_templates', 'README.md'),
     `# 📐 产品模板区（可选）

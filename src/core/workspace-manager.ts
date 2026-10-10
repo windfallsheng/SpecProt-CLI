@@ -55,7 +55,7 @@ export interface MaterialContext {
     file: string;
     content: string;
     platform: Platform | 'shared' | 'unknown';
-    type: 'discussion' | 'reference' | 'idea' | 'screenshot' | 'converted' | 'other';
+    type: 'discussion' | 'reference' | 'idea' | 'screenshot' | 'converted' | 'refined' | 'other';
   }[];
   identifiedRoles: string[];      // 从素材中识别的用户角色
   identifiedScenarios: string[];  // 从素材中识别的场景
@@ -92,6 +92,11 @@ export function getConvertedDir(iterationName: string): string {
 /** 转换产物端目录（converted/{端}/，与素材端目录一一对应） */
 export function getConvertedPlatformDir(iterationName: string, platform: Platform | 'shared'): string {
   return join(getConvertedDir(iterationName), platform);
+}
+
+/** 提炼稿目录（converted/{端}/_refined/，宿主 AI 提炼的干货，分析优先依据） */
+export function getRefinedPlatformDir(iterationName: string, platform: Platform | 'shared'): string {
+  return join(getConvertedPlatformDir(iterationName, platform), '_refined');
 }
 
 function getPlatformDir(iterationName: string, platform: Platform): string {
@@ -175,9 +180,14 @@ export async function collectMaterials(
   const convertedDirs: Array<{ dir: string; platform: Platform | 'shared' }> = [
     { dir: 'converted', platform: 'shared' },
     { dir: 'converted/shared', platform: 'shared' },
+    { dir: 'converted/shared/_refined', platform: 'shared' },
   ];
   for (const d of rawDirs) {
-    if (d.platform !== 'shared') convertedDirs.push({ dir: `converted/${d.platform}`, platform: d.platform });
+    if (d.platform !== 'shared') {
+      convertedDirs.push({ dir: `converted/${d.platform}`, platform: d.platform });
+      // 提炼稿子目录（_refined/）——存在时优先注入，标记 type=refined
+      convertedDirs.push({ dir: `converted/${d.platform}/_refined`, platform: d.platform });
+    }
   }
 
   const keepPlatform = (platform: Platform | 'shared') => {
@@ -190,12 +200,13 @@ export async function collectMaterials(
 
   const textParts: string[] = [];
 
-  const scanDir = async (dir: string, platform: Platform | 'shared', isConverted = false) => {
+  const scanDir = async (dir: string, platform: Platform | 'shared', isConverted = false, isRefined = false) => {
     const fullDir = join(materialsDir, dir);
     if (!(await pathExists(fullDir))) return;
 
     for (const file of await readdir(fullDir)) {
       if (file === 'README.md') continue;
+      if (file.startsWith('_')) continue; // 清单/索引类文件（如 _pending-ai.md）不入素材
       const filePath = join(fullDir, file);
 
       try {
@@ -207,12 +218,14 @@ export async function collectMaterials(
       try {
         const content = await readFile(filePath, 'utf-8');
 
-        // 分类素材类型
-        let type: MaterialContext['sources'][0]['type'] = isConverted ? 'converted' : 'other';
-        if (file.includes('讨论') || file.includes('会议')) type = 'discussion';
-        else if (file.includes('参考') || file.includes('链接')) type = 'reference';
-        else if (file.includes('想法') || file.includes('随笔')) type = 'idea';
-        else if (file.match(/\.(png|jpg|jpeg|gif|bmp)$/i)) type = 'screenshot';
+        // 分类素材类型（_refined/ 目录的文件强制 refined，其余保持原分类）
+        let type: MaterialContext['sources'][0]['type'] = isRefined ? 'refined' : isConverted ? 'converted' : 'other';
+        if (!isRefined) {
+          if (file.includes('讨论') || file.includes('会议')) type = 'discussion';
+          else if (file.includes('参考') || file.includes('链接')) type = 'reference';
+          else if (file.includes('想法') || file.includes('随笔')) type = 'idea';
+          else if (file.match(/\.(png|jpg|jpeg|gif|bmp)$/i)) type = 'screenshot';
+        }
 
         context.sources.push({ file: `${dir}/${file}`, content: content.slice(0, 5000), platform, type });
         textParts.push(`[${dir}/${file}]\n${content}`);
@@ -227,7 +240,7 @@ export async function collectMaterials(
     await scanDir(dir, platform);
   }
   for (const { dir, platform } of convPlatformDirs) {
-    await scanDir(dir, platform, true);
+    await scanDir(dir, platform, true, dir.includes('/_refined'));
   }
 
   context.rawText = textParts.join('\n\n---\n\n');
