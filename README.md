@@ -74,6 +74,21 @@ AI 写需求因此「有前例可循」：新单元与历史重复或冲突时�
 
 `ask` 是执行引擎而非指路牌：听懂就办。参数缺失时输出 `[SPECPROT_NEEDS_INFO]` 点名缺什么，宿主 AI 一见便知该追问。
 
+## 素材处理策略 — 原味转换 + 干货提炼
+
+`convert` 只做确定性格式转换（docx/pdf/xlsx → md，一字不差）；语义提炼是 AI 的活，
+落在 `00-素材/converted/{端}/_refined/`（干货），原味产物保留作回溯。`analyze` 优先
+以提炼稿为依据，原文回溯核对，冲突以提炼稿为准、疑点进待确认清单。
+
+音视频素材走期次根目录 `.specprot.yml`（可选，删除即全默认）：
+
+| 配置 | 取值 | 说明 |
+| :--- | :--- | :--- |
+| `materials.audio.mode` / `materials.video.mode` | `prompt`（默认）/ `ai` / `local` / `third-party` | 提示自行转写 / 宿主 AI 直读 / 本地 whisper / 三方 API。CLI 只生成接力清单（`converted/_pending-ai.md`），执行由宿主 AI 按协议完成 |
+| `materials.refine.enabled` | `true`（默认）/ `false` | 提炼稿机制开关 |
+
+视频永远拆两路：音轨走转写链 + 关键帧进 `{端}/frames/`（自动收录图片索引）。
+
 ## check — 随时按下的体检仪
 
 写完一段、一个单元、甚至整个期次，随时体检，五维全面评估：

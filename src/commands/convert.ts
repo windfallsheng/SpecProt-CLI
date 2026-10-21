@@ -8,7 +8,7 @@
  */
 
 import { scanAndConvert, buildImageIndex } from '../core/material-converter';
-import { Platform } from '../core/workspace-manager';
+import { listIterationPlatforms, Platform } from '../core/workspace-manager';
 
 export interface ConvertOptions {
   iteration: string;
@@ -51,7 +51,8 @@ export async function convertCommand(options: ConvertOptions): Promise<void> {
     console.log('📌 宿主 AI 指令：按清单处理协议逐个处理（转写 → 提炼 → 落盘 converted/{端}/_refined/），完成后删除清单再推进分析。');
   }
   console.log('');
-  console.log('💡 下一步: specprot analyze -i "' + options.iteration + '" -p web');
+  const platforms = await listIterationPlatforms(options.iteration);
+  console.log('💡 下一步: specprot analyze -i "' + options.iteration + '" -p ' + (platforms[0] || '<端>'));
   console.log('');
   console.log('[SPECPROT_STEP_DONE]');
   console.log('[SPECPROT_NEXT_STEP] ' + (summary.pendingAI.length > 0

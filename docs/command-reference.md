@@ -61,6 +61,8 @@ specprot run -i 期次-2026-Q3 --from analyze --to slice
 | `materials.video.mode` | 同上 | 视频处理模式(视频 = 音轨转写 + 关键帧进图片索引) |
 | `materials.refine.enabled` | `true`(默认) / `false` | 提炼稿机制开关 |
 
+> 注意:`local` / `third-party` 模式同样只生成接力清单,转写执行由宿主 AI 完成(CLI 零转写依赖);清单每次 convert 重建,素材清空后自动清除。
+
 **提炼稿机制**:宿主 AI 将杂乱素材提炼为干货,落盘 `00-素材/converted/{端}/_refined/`(四板斧:去噪 → 分段 → 结论先行 → 溯源)。analyze 优先以提炼稿为依据,原味转换产物保留作回溯。音视频以 `ai` 模式处理时,convert 生成 `converted/_pending-ai.md` 接力清单,宿主 AI 转写提炼后删除清单。
 
 ### analyze(别名 az)

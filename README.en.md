@@ -74,6 +74,23 @@ The AI thus writes with precedent: duplicate or conflicting units get a 「待�
 
 `ask` is an execution engine, not a tour guide: it understands and acts. When parameters are missing it emits `[SPECPROT_NEEDS_INFO]` naming exactly what is needed.
 
+## Material Strategy — Verbatim Conversion + Refined Drafts
+
+`convert` performs deterministic format conversion only (docx/pdf/xlsx → md, verbatim);
+semantic distillation is the AI's job and lands in `00-素材/converted/{platform}/_refined/`
+(dry goods), while verbatim output stays as trace-back. `analyze` prioritizes refined drafts,
+uses verbatim copies for cross-checking, and records conflicts or doubts in the clarify list.
+
+Audio/video materials follow `.specprot.yml` at the iteration root (optional; delete = defaults):
+
+| Key | Values | Description |
+| :--- | :--- | :--- |
+| `materials.audio.mode` / `materials.video.mode` | `prompt` (default) / `ai` / `local` / `third-party` | Manual transcription hint / host-AI direct read / local whisper / third-party API. The CLI only generates the handoff list (`converted/_pending-ai.md`); execution follows the host-AI protocol |
+| `materials.refine.enabled` | `true` (default) / `false` | Refined-draft mechanism toggle |
+
+Videos always split two ways: audio track through the transcription chain + keyframes into
+`{platform}/frames/` (auto-collected by the image index).
+
 ## check — The Health Checker, Anytime
 
 Five-dimension assessment over five entry points:

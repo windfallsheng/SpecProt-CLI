@@ -26,6 +26,8 @@ jobs:
         name: TypeScript 类型检查
       - run: npm run build
         name: 构建 dist
+      - run: npm test
+        name: 单元测试（素材策略回归锚点）
 
   # ========================================
   # 2. 自动发布（仅 release 事件触发，与 SpecCore 同构）

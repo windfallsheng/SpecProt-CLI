@@ -19,6 +19,7 @@
 
 import { ensureDir, writeFile, readFile, pathExists, readdir, stat } from 'fs-extra';
 import { join } from 'path';
+import * as yaml from 'js-yaml';
 
 // ============================================================
 // 类型定义
@@ -60,7 +61,6 @@ export interface MaterialContext {
   identifiedRoles: string[];      // 从素材中识别的用户角色
   identifiedScenarios: string[];  // 从素材中识别的场景
   identifiedConstraints: string[]; // 从素材中识别的约束
-  rawText: string;                // 所有文本素材的拼接
 }
 
 // ============================================================
@@ -142,6 +142,65 @@ export function getWorkspaceReadmePath(iterationName: string): string {
 }
 
 // ============================================================
+// 素材处理策略配置（{期次}/.specprot.yml）
+// ============================================================
+
+export type MediaMode = 'prompt' | 'ai' | 'local' | 'third-party';
+
+export interface MaterialConfig {
+  audio: { mode: MediaMode };
+  video: { mode: MediaMode };
+  refine: { enabled: boolean };
+}
+
+const DEFAULT_CONFIG: MaterialConfig = {
+  audio: { mode: 'prompt' },
+  video: { mode: 'prompt' },
+  refine: { enabled: true },
+};
+
+const VALID_MODES = ['prompt', 'ai', 'local', 'third-party'];
+
+/** 读取期次级素材处理策略（缺失/解析失败 → 全默认，向后兼容） */
+export async function readMaterialConfig(iterationName: string): Promise<MaterialConfig> {
+  const cfgPath = join(process.cwd(), iterationName, '.specprot.yml');
+  if (!(await pathExists(cfgPath))) return DEFAULT_CONFIG;
+  try {
+    const parsed = yaml.load(await readFile(cfgPath, 'utf-8')) as { materials?: any };
+    const m = parsed?.materials ?? {};
+    const modeOf = (raw: any, fallback: MediaMode): MediaMode =>
+      typeof raw?.mode === 'string' && VALID_MODES.includes(raw.mode) ? raw.mode : fallback;
+    return {
+      audio: { mode: modeOf(m.audio, DEFAULT_CONFIG.audio.mode) },
+      video: { mode: modeOf(m.video, DEFAULT_CONFIG.video.mode) },
+      refine: { enabled: m.refine?.enabled !== false },
+    };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+/**
+ * 期次端列表：README 平台行 ∪ 素材区实际端子目录（端名产品自定，目录即声明）。
+ * 供 convert 扫描、run 素材闸口等消费——禁止再硬编码 web/h5/miniapp/backend。
+ */
+export async function listIterationPlatforms(iterationName: string): Promise<string[]> {
+  const platforms: string[] = [];
+  const info = await readWorkspaceInfo(iterationName);
+  if (info?.platforms?.length) platforms.push(...info.platforms);
+  const matDir = getMaterialsDir(iterationName);
+  if (await pathExists(matDir)) {
+    for (const f of await readdir(matDir)) {
+      if (f === 'shared' || f === 'converted' || f === '_templates' || f === 'README.md' || f.startsWith('.')) continue;
+      const st = await stat(join(matDir, f)).catch(() => null);
+      if (!st || !st.isDirectory()) continue;
+      if (!platforms.includes(f)) platforms.push(f);
+    }
+  }
+  return platforms;
+}
+
+// ============================================================
 // 素材收集
 // ============================================================
 
@@ -160,7 +219,6 @@ export async function collectMaterials(
     identifiedRoles: [],
     identifiedScenarios: [],
     identifiedConstraints: [],
-    rawText: '',
   };
 
   if (!(await pathExists(materialsDir))) {
@@ -177,16 +235,31 @@ export async function collectMaterials(
     rawDirs.push({ dir: f, platform: f });
   }
   rawDirs.push({ dir: 'shared', platform: 'shared' });
+  const cfg = await readMaterialConfig(iterationName);
   const convertedDirs: Array<{ dir: string; platform: Platform | 'shared' }> = [
     { dir: 'converted', platform: 'shared' },
     { dir: 'converted/shared', platform: 'shared' },
-    { dir: 'converted/shared/_refined', platform: 'shared' },
   ];
-  for (const d of rawDirs) {
-    if (d.platform !== 'shared') {
-      convertedDirs.push({ dir: `converted/${d.platform}`, platform: d.platform });
-      // 提炼稿子目录（_refined/）——存在时优先注入，标记 type=refined
-      convertedDirs.push({ dir: `converted/${d.platform}/_refined`, platform: d.platform });
+  if (cfg.refine.enabled) {
+    convertedDirs.push({ dir: 'converted/shared/_refined', platform: 'shared' });
+  }
+  // converted/{端}/ 端集合：素材区端目录 ∪ converted 下实际子目录
+  // （覆盖「素材区无该端目录、只有 converted/{端}/_refined/」的场景，如仅投提炼稿）
+  const convPlatforms = new Set<string>();
+  const convRoot = join(materialsDir, 'converted');
+  if (await pathExists(convRoot)) {
+    for (const f of await readdir(convRoot)) {
+      if (f === 'shared' || f.startsWith('_') || f.startsWith('.')) continue;
+      const cst = await stat(join(convRoot, f)).catch(() => null);
+      if (cst?.isDirectory()) convPlatforms.add(f);
+    }
+  }
+  for (const d of rawDirs) if (d.platform !== 'shared') convPlatforms.add(d.platform);
+  for (const p of convPlatforms) {
+    convertedDirs.push({ dir: `converted/${p}`, platform: p });
+    // 提炼稿子目录（_refined/）——存在且开启提炼稿机制时优先注入，标记 type=refined
+    if (cfg.refine.enabled) {
+      convertedDirs.push({ dir: `converted/${p}/_refined`, platform: p });
     }
   }
 
@@ -198,8 +271,6 @@ export async function collectMaterials(
   const rawPlatformDirs = rawDirs.filter(({ platform }) => keepPlatform(platform));
   const convPlatformDirs = convertedDirs.filter(({ platform }) => keepPlatform(platform));
 
-  const textParts: string[] = [];
-
   const scanDir = async (dir: string, platform: Platform | 'shared', isConverted = false, isRefined = false) => {
     const fullDir = join(materialsDir, dir);
     if (!(await pathExists(fullDir))) return;
@@ -208,29 +279,34 @@ export async function collectMaterials(
       if (file === 'README.md') continue;
       if (file.startsWith('_')) continue; // 清单/索引类文件（如 _pending-ai.md）不入素材
       const filePath = join(fullDir, file);
+      const st = await stat(filePath).catch(() => null);
+      if (!st || st.isDirectory()) continue;
 
-      try {
-        const { stat } = await import('fs-extra');
-        const st = await stat(filePath);
-        if (st.isDirectory()) continue;
-      } catch { continue; }
+      // 分类素材类型（_refined/ 目录的文件强制 refined，其余保持原分类）
+      const isImage = /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(file);
+      let type: MaterialContext['sources'][0]['type'] = isRefined ? 'refined' : isConverted ? 'converted' : 'other';
+      if (!isRefined && isImage) type = 'screenshot';
+      else if (!isRefined) {
+        if (file.includes('讨论') || file.includes('会议')) type = 'discussion';
+        else if (file.includes('参考') || file.includes('链接')) type = 'reference';
+        else if (file.includes('想法') || file.includes('随笔')) type = 'idea';
+      }
+
+      // 图片/二进制不读内容（UTF-8 解二进制不报错、会产生乱码污染 prompt）；AI 按需 Read 原图
+      if (isImage) {
+        context.sources.push({ file: `${dir}/${file}`, content: `[图片素材: 请用 Read 工具查看 00-素材/${dir}/${file}]`, platform, type });
+        continue;
+      }
 
       try {
         const content = await readFile(filePath, 'utf-8');
-
-        // 分类素材类型（_refined/ 目录的文件强制 refined，其余保持原分类）
-        let type: MaterialContext['sources'][0]['type'] = isRefined ? 'refined' : isConverted ? 'converted' : 'other';
-        if (!isRefined) {
-          if (file.includes('讨论') || file.includes('会议')) type = 'discussion';
-          else if (file.includes('参考') || file.includes('链接')) type = 'reference';
-          else if (file.includes('想法') || file.includes('随笔')) type = 'idea';
-          else if (file.match(/\.(png|jpg|jpeg|gif|bmp)$/i)) type = 'screenshot';
-        }
-
-        context.sources.push({ file: `${dir}/${file}`, content: content.slice(0, 5000), platform, type });
-        textParts.push(`[${dir}/${file}]\n${content}`);
+        const truncated = content.length > 5000;
+        const visible = truncated
+          ? content.slice(0, 5000) + `\n\n…（内容截断，共 ${content.length} 字符；全文见 00-素材/${dir}/${file}）`
+          : content;
+        context.sources.push({ file: `${dir}/${file}`, content: visible, platform, type });
       } catch {
-        // 跳过二进制文件
+        // 非文本文件（加密/损坏等无法以 UTF-8 读取）
         context.sources.push({ file: `${dir}/${file}`, content: `[非文本文件: ${file}]`, platform, type: 'other' });
       }
     }
@@ -243,7 +319,6 @@ export async function collectMaterials(
     await scanDir(dir, platform, true, dir.includes('/_refined'));
   }
 
-  context.rawText = textParts.join('\n\n---\n\n');
   return context;
 }
 

@@ -40,6 +40,7 @@ export async function iterationCreateCommand(options: IterationCreateOptions): P
     const platforms = options.platforms
       ? options.platforms.split(',').map((p) => p.trim()).filter(Boolean)
       : undefined;
+    const hintPlatform = (platforms && platforms.length > 0 ? platforms[0] : 'web');
 
     const dir = await createIteration({
       name: options.name,
@@ -57,8 +58,8 @@ export async function iterationCreateCommand(options: IterationCreateOptions): P
     console.log('下一步：');
     console.log(`  1. 把素材扔进 ${options.name}/00-素材/{端}/（跨端通用放 shared/）`);
     console.log(`  2. 转换素材: specprot convert -i ${options.name}`);
-    console.log(`  3. 端级分析: specprot analyze -i ${options.name} -p web`);
-    console.log(`  4. 功能切分: specprot slice -i ${options.name} -p web`);
+    console.log(`  3. 端级分析: specprot analyze -i ${options.name} -p ${hintPlatform}`);
+    console.log(`  4. 功能切分: specprot slice -i ${options.name} -p ${hintPlatform}`);
     console.log(`  5. 正典归位: specprot req adopt -i ${options.name} -p web -f <单元>`);
     console.log(`  6. 冻结交接: specprot iteration freeze -n ${options.name}`);
     console.log('');

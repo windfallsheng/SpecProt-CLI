@@ -10,16 +10,17 @@
  * 原始素材只读，转换产物进 converted/——对应 SpecCore sources/ 只读纪律。
  */
 
-import { readFile, writeFile, pathExists, readdir, ensureDir, stat } from 'fs-extra';
+import { readFile, writeFile, pathExists, readdir, ensureDir, stat, remove } from 'fs-extra';
 import { join, extname, basename } from 'path';
 import mammoth from 'mammoth';
-import * as yaml from 'js-yaml';
 // @ts-ignore — pdf-parse 无类型定义
 import pdfParse from 'pdf-parse';
 import * as XLSX from 'xlsx';
 import {
   getMaterialPlatformDir,
   getConvertedDir,
+  listIterationPlatforms,
+  readMaterialConfig,
   Platform,
 } from './workspace-manager';
 
@@ -40,45 +41,6 @@ export interface ConvertSummary {
   skipped: string[];   // 无法转换的文件（prompt 模式的音视频/未知格式）
   images: string[];    // 图片清单（建立索引）
   pendingAI: string[]; // 待宿主 AI 处理的音视频文件（ai/local/third-party 模式）
-}
-
-// ============================================================
-// 素材处理策略配置（{期次}/.specprot.yml）
-// ============================================================
-
-export type MediaMode = 'prompt' | 'ai' | 'local' | 'third-party';
-
-export interface MaterialConfig {
-  audio: { mode: MediaMode };
-  video: { mode: MediaMode };
-  refine: { enabled: boolean };
-}
-
-const DEFAULT_CONFIG: MaterialConfig = {
-  audio: { mode: 'prompt' },
-  video: { mode: 'prompt' },
-  refine: { enabled: true },
-};
-
-const VALID_MODES = ['prompt', 'ai', 'local', 'third-party'];
-
-/** 读取期次级素材处理策略（缺失/解析失败 → 全默认，向后兼容） */
-export async function readMaterialConfig(iterationName: string): Promise<MaterialConfig> {
-  const cfgPath = join(process.cwd(), iterationName, '.specprot.yml');
-  if (!(await pathExists(cfgPath))) return DEFAULT_CONFIG;
-  try {
-    const parsed = yaml.load(await readFile(cfgPath, 'utf-8')) as { materials?: any };
-    const m = parsed?.materials ?? {};
-    const modeOf = (raw: any, fallback: MediaMode): MediaMode =>
-      typeof raw?.mode === 'string' && VALID_MODES.includes(raw.mode) ? raw.mode : fallback;
-    return {
-      audio: { mode: modeOf(m.audio, DEFAULT_CONFIG.audio.mode) },
-      video: { mode: modeOf(m.video, DEFAULT_CONFIG.video.mode) },
-      refine: { enabled: m.refine?.enabled !== false },
-    };
-  } catch {
-    return DEFAULT_CONFIG;
-  }
 }
 
 // ============================================================
@@ -156,16 +118,21 @@ export async function scanAndConvert(
   const summary: ConvertSummary = { total: 0, converted: [], skipped: [], images: [], pendingAI: [] };
   const cfg = await readMaterialConfig(iterationName);
 
+  // 端列表动态解析（端名产品自定，不硬编码 web/h5/miniapp/backend）
   const scanDirs: Array<{ dir: string }> = [];
   if (targetPlatform && targetPlatform !== 'shared') {
     scanDirs.push({ dir: targetPlatform });
   } else {
-    for (const d of ['web', 'h5', 'miniapp', 'backend']) scanDirs.push({ dir: d });
+    for (const d of await listIterationPlatforms(iterationName)) scanDirs.push({ dir: d });
   }
   scanDirs.push({ dir: 'shared' });
 
   const convertedDir = getConvertedDir(iterationName);
   await ensureDir(convertedDir);
+
+  // 接力清单生命周期：每次扫描重建，防止素材清空后旧清单残留
+  const pendingPath = join(convertedDir, '_pending-ai.md');
+  if (await pathExists(pendingPath)) await remove(pendingPath);
 
   for (const { dir } of scanDirs) {
     const srcDir = getMaterialPlatformDir(iterationName, dir as Platform | 'shared');
@@ -174,7 +141,18 @@ export async function scanAndConvert(
     for (const file of await readdir(srcDir)) {
       const srcPath = join(srcDir, file);
       const st = await stat(srcPath);
-      if (st.isDirectory()) continue;
+      // frames/ 子目录：视频关键帧图片，递归一层收录进图片索引
+      if (st.isDirectory()) {
+        if (file === 'frames') {
+          for (const f of await readdir(srcPath)) {
+            if (IMAGE.test(f)) {
+              summary.images.push(`${dir}/frames/${f}`);
+              summary.total++;
+            }
+          }
+        }
+        continue;
+      }
       summary.total++;
 
       if (CONVERTIBLE.test(file)) {

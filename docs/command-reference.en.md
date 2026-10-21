@@ -61,6 +61,8 @@ Material conversion: docx/pdf/xlsx → md (verbatim), image indexing; audio/vide
 | `materials.video.mode` | same as above | Video mode (audio-track transcription + keyframes into image index) |
 | `materials.refine.enabled` | `true` (default) / `false` | Refined-draft mechanism toggle |
 
+> Note: `local` / `third-party` modes also only generate the handoff list; transcription is performed by the host AI (the CLI ships zero transcription dependencies). The list is rebuilt on every `convert` and auto-removed once materials are gone.
+
 **Refined-draft mechanism**: the host AI distills noisy materials into refined drafts at `00-素材/converted/{platform}/_refined/` (denoise → segment → conclusion-first → traceability). `analyze` prioritizes refined drafts; verbatim conversions remain as trace-back sources. With `ai` mode, `convert` generates `converted/_pending-ai.md` handoff list; delete it after transcription + refinement.
 
 ### analyze (alias az)

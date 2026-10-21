@@ -8,7 +8,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc && node dist/cli.js"
+    "dev": "tsc && node dist/cli.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "commander": "^12.0.0",
@@ -28,6 +29,8 @@
   "files": [
     "bin",
     "dist",
+    ".agents",
+    "templates",
     "README.md",
     "README.en.md",
     "docs"

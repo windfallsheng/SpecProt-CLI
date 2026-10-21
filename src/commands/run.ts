@@ -28,7 +28,7 @@ import {
   getMaterialPlatformDir,
   getConvertedDir,
   getConvertedPlatformDir,
-  readWorkspaceInfo,
+  listIterationPlatforms,
   Platform,
 } from '../core/workspace-manager';
 
@@ -88,21 +88,22 @@ async function saveState(state: RunState): Promise<void> {
 
 /** 素材区是否空空如也（端素材目录 + converted/{端}/；converted 根级只算文件，预建空目录不算） */
 async function hasAnyMaterial(iterationName: string): Promise<boolean> {
-  const platforms = ['web', 'h5', 'miniapp', 'backend', 'shared'];
+  const platforms = await listIterationPlatforms(iterationName);
   const dirs: string[] = [];
-  for (const p of platforms) {
+  for (const p of [...platforms, 'shared']) {
     dirs.push(getMaterialPlatformDir(iterationName, p as Platform | 'shared'));
     dirs.push(getConvertedPlatformDir(iterationName, p as Platform | 'shared'));
   }
   for (const d of dirs) {
     if (!(await pathExists(d))) continue;
-    const files = (await readdir(d)).filter((f) => f !== 'README.md');
+    const files = (await readdir(d)).filter((f) => f !== 'README.md' && !f.startsWith('.'));
     if (files.length > 0) return true;
   }
-  // converted 根级文件（images-index.md 等）——子目录本身不算素材
+  // converted 根级文件（images-index.md 等）——子目录本身不算素材；清单类（_ 开头）不计
   const root = getConvertedDir(iterationName);
   if (await pathExists(root)) {
     for (const f of await readdir(root)) {
+      if (f.startsWith('_')) continue;
       if ((await stat(join(root, f))).isFile()) return true;
     }
   }
@@ -156,10 +157,10 @@ export async function runCommand(options: RunOptions): Promise<void> {
   }
 
   // ── 1. 范围确定 ──
-  const info = await readWorkspaceInfo(options.iteration);
   const platforms: string[] = options.platforms
     ? options.platforms.split(',').map((p) => p.trim()).filter(Boolean)
-    : (info?.platforms?.length ? info.platforms : ['web']);
+    : await listIterationPlatforms(options.iteration);
+  if (platforms.length === 0) platforms.push('web'); // 极端兜底：无平台声明且素材区为空
 
   const fromIdx = Math.max(0, STAGES.indexOf((options.from || 'convert') as Stage));
   const toIdx = Math.max(fromIdx, STAGES.indexOf((options.to || 'slice') as Stage));

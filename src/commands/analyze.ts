@@ -41,6 +41,13 @@ export async function analyzeCommand(options: AnalyzeOptions): Promise<void> {
 
   console.log(`🔍 端级分析: ${options.iteration} / ${label}\n`);
 
+  // 音视频接力清单存在 → 提示先处理再分析（清单产物落盘后由宿主 AI 删除）
+  const pendingAi = join(getWorkspaceDir(options.iteration), '00-素材', 'converted', '_pending-ai.md');
+  if (await pathExists(pendingAi)) {
+    console.warn(`⚠️  存在未处理的音视频接力清单: 00-素材/converted/_pending-ai.md`);
+    console.warn(`   建议先按清单协议转写提炼（落盘 converted/{端}/_refined/ 后删除清单），再继续分析。\n`);
+  }
+
   // 1. 收集端素材（本端素材 + 本端转换产物 + shared 跨端通用）
   const context = await collectMaterials(options.iteration, platform);
   const platformSources = context.sources.filter((s) => s.platform === platform);
